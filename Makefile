@@ -27,6 +27,7 @@ ifeq "$(BUILD_TYPE)" "Debug"
 OPT_FLAGS = -g
 endif
 
+.PRECIOUS: $(UNZIP_DIR)/Makefile
 $(UNZIP_DIR)/Makefile:
 	$(MAKE) configure
 
@@ -41,6 +42,7 @@ configure: $(UNZIP_DIR)/configure
 		CXXFLAGS="-I$(BUILD_PREFIX)/include $(OPT_FLAGS) $(CXXFLAGS)" \
 		LDFLAGS="-L$(BUILD_PREFIX)/lib $(LDFLAGS)"
 
+.PRECIOUS: $(UNZIP_DIR)/configure
 $(UNZIP_DIR)/configure:
 	@echo "\nDownloading lcm \n\n"
 	wget -T 60 $(DL_LINK)/$(DL_FILE)
