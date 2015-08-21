@@ -40,10 +40,10 @@ add_subdirectory(lcm-logger)
 #add_subdirectory(m4macros)
 
 # set up Java, use a target of 1.6
-find_package(Java)
+find_package(Java 1.6)
 if (JAVA_FOUND)
    include(UseJava)
-   set(CMAKE_JAVA_COMPILE_FLAGS ${CMAKE_JAVA_COMPILE_FLAGS} -source 1.5 -target 1.5)
+   set(CMAKE_JAVA_COMPILE_FLAGS ${CMAKE_JAVA_COMPILE_FLAGS} -source 1.6 -target 1.6)
 
   add_subdirectory(lcm-java)
 endif()
