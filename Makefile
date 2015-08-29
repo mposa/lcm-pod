@@ -38,7 +38,7 @@ all: pod-build/Makefile
 	-mv $(BUILD_PREFIX)/share/java/lcm-java.jar $(BUILD_PREFIX)/share/java/lcm.jar  2>/dev/null # the old version of cmake seem to not respect the OUTPUT_NAME field in add_jar
 
 pod-build/Makefile:
-	$(MAKE) configure
+	"$(MAKE)" configure
 
 .PHONY: configure
 configure: 
