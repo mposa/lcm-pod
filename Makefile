@@ -1,6 +1,3 @@
-DL_FILE := lcm-1.0.0.tar.gz
-DL_LINK := http://lcm.googlecode.com/files/
-UNZIP_DIR := lcm-1.0.0
 
 BUILD_SYSTEM:=$(OS)
 ifeq ($(BUILD_SYSTEM),Windows_NT)
@@ -33,35 +30,36 @@ ifeq "$(BUILD_SYSTEM)" "Cygwin"
 endif
 
 
-all: pod-build/Makefile
-	cmake --build pod-build --config $(BUILD_TYPE) --target install
+all: lcm-1.0.0/pod-build/Makefile
+	cmake --build lcm-1.0.0/pod-build --config $(BUILD_TYPE) --target install
 	-mv $(BUILD_PREFIX)/share/java/lcm-java.jar $(BUILD_PREFIX)/share/java/lcm.jar  2>/dev/null # the old version of cmake seem to not respect the OUTPUT_NAME field in add_jar
 
-pod-build/Makefile:
+lcm-1.0.0/pod-build/Makefile:
 	"$(MAKE)" configure
 
 .PHONY: configure
-configure: 
+configure:
 	@echo "\nBUILD_PREFIX: $(BUILD_PREFIX)\n\n"
 
 	# create the temporary build directory if needed
-	@mkdir -p pod-build
+	@mkdir -p lcm-1.0.0/pod-build
 
 	# run CMake to generate and configure the build scripts
 	# (note: i'm not passing the CMAKE_FLAGS here because it appears i need to use the 32-bit generator even on my 64-bit machine)
-	@cd pod-build && cmake $(CMAKE_FLAGS) -DCMAKE_INSTALL_PREFIX="$(BUILD_PREFIX)" \
-		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) ../$(UNZIP_DIR) 
-
-install_prereqs_homebrew :
-	brew install glib coreutils
+	@cd lcm-1.0.0/pod-build && cmake $(CMAKE_FLAGS) -DCMAKE_INSTALL_PREFIX="$(BUILD_PREFIX)" \
+		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) ..
 
 clean:
-	-if [ -e $(UNZIP_DIR)/Makefile ]; then $(MAKE) -C $(UNZIP_DIR) clean uninstall; fi
-	-if [ -e $(UNZIP_DIR)/Makefile ]; then $(MAKE) -C $(UNZIP_DIR) distclean; fi
+ifeq ($(BUILD_SYSTEM),Windows_NT)
+	rd /s lcm-1.0.0/pod-build
+else
+	-if [ -e lcm-1.0.0/pod-build/install_manifest.txt ]; then rm -f `cat lcm-1.0.0/pod-build/install_manifest.txt`; fi
+	-if [ -d lcm-1.0.0/pod-build ]; then cmake --build lcm-1.0.0/pod-build --target clean; rm -rf lcm-1.0.0/pod-build; fi
+endif
 
-# other (custom) targets are passed through to the cmake-generated Makefile 
+# other (custom) targets are passed through to the cmake-generated Makefile
 %::
-	cd pod-build && $(CMAKE_MAKE_PROGRAM) $@
+	cd lcm-1.0.0/pod-build && $(CMAKE_MAKE_PROGRAM) $@
 
 # Default to a less-verbose build.  If you want all the gory compiler output,
 # run "make VERBOSE=1"
