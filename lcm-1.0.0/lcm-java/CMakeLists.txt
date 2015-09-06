@@ -1,4 +1,12 @@
 
+set (CMAKE_JAVA_TARGET_OUTPUT_NAME lcm)  # todo: remove this when cmake min version >= 2.8.12
+# from UseJava.cmake
+# In CMake < 2.8.12, add_jar used variables which were set prior to calling
+# add_jar for customizing the behavior of add_jar. In order to be backwards
+# compatible, check if any of those variables are set, and use them to
+# initialize values of the named arguments. (Giving the corresponding named
+# argument will override the value set here.)
+
 add_jar(lcm-java
     lcm/lcm/LCMEncodable.java
     lcm/lcm/LCM.java
