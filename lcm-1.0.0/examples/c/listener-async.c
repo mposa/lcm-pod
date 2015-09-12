@@ -21,12 +21,12 @@
 #include "exlcm_example_t.h"
 
 static void
-my_handler(const lcm_recv_buf_t *rbuf, const char * channel, 
+my_handler(const lcm_recv_buf_t *rbuf, const char * channel,
         const exlcm_example_t * msg, void * user)
 {
     int i;
     printf("Received message on channel \"%s\":\n", channel);
-    printf("  timestamp   = %"PRId64"\n", msg->timestamp);
+    printf("  timestamp   = %" PRId64 "\n", msg->timestamp);
     printf("  position    = (%f, %f, %f)\n",
             msg->position[0], msg->position[1], msg->position[2]);
     printf("  orientation = (%f, %f, %f, %f)\n",
@@ -60,7 +60,7 @@ main(int argc, char ** argv)
         FD_SET(lcm_fd, &fds);
 
         // wait a limited amount of time for an incoming message
-        struct timeval timeout = { 
+        struct timeval timeout = {
             1,  // seconds
             0   // microseconds
         };

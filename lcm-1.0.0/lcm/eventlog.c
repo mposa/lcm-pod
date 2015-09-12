@@ -20,7 +20,7 @@
 lcm_eventlog_t *lcm_eventlog_create(const char *path, const char *mode)
 {
     assert(!strcmp(mode, "r") || !strcmp(mode, "w"));
-    if(*mode == 'w') 
+    if(*mode == 'w')
         mode = "wb";
     else if(*mode == 'r')
         mode = "rb";
@@ -49,9 +49,9 @@ void lcm_eventlog_destroy(lcm_eventlog_t *l)
 
 lcm_eventlog_event_t *lcm_eventlog_read_next_event(lcm_eventlog_t *l)
 {
-    lcm_eventlog_event_t *le = 
+    lcm_eventlog_event_t *le =
         (lcm_eventlog_event_t*) calloc(1, sizeof(lcm_eventlog_event_t));
-    
+
     int32_t magic = 0;
     int r;
 
@@ -71,9 +71,9 @@ lcm_eventlog_event_t *lcm_eventlog_read_next_event(lcm_eventlog_t *l)
     if (l->eventcount != le->eventnum) {
         // these warnings will spew unnecessarily for log files that have been
         // filtered through lcm-logplayer-gui since it preserves event numbers
-//        printf ("Mismatch: eventcount %"PRId64" eventnum %"PRId64"\n", 
+//        printf ("Mismatch: eventcount %" PRId64 " eventnum %"PRId64"\n",
 //                l->eventcount, le->eventnum);
-//        printf ("file offset %"PRId64"\n", ftello (l->f));
+//        printf ("file offset %" PRId64 "\n", ftello (l->f));
         l->eventcount = le->eventnum;
     }
 
@@ -84,7 +84,7 @@ lcm_eventlog_event_t *lcm_eventlog_read_next_event(lcm_eventlog_t *l)
     le->data = calloc(1, le->datalen+1);
     if (fread(le->data, 1, le->datalen, l->f) != (size_t) le->datalen)
         goto eof;
-    
+
     l->eventcount++;
 
     return le;
@@ -107,7 +107,7 @@ int lcm_eventlog_write_event(lcm_eventlog_t *l, lcm_eventlog_event_t *le)
     if (0 != fwrite32(l->f, le->channellen)) return -1;
     if (0 != fwrite32(l->f, le->datalen)) return -1;
 
-    if (le->channellen != fwrite(le->channel, 1, le->channellen, l->f)) 
+    if (le->channellen != fwrite(le->channel, 1, le->channellen, l->f))
         return -1;
     if (le->datalen != fwrite(le->data, 1, le->datalen, l->f))
         return -1;
@@ -175,7 +175,7 @@ int lcm_eventlog_seek_to_timestamp(lcm_eventlog_t *l, int64_t timestamp)
         frac = (double)ftello (l->f)/file_len;
         if ((frac > frac2) || (frac < frac1) || (frac1>=frac2))
             break;
-    
+
         double df = frac-prev_frac;
         if (df < 0)
             df = -df;

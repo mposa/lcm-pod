@@ -5,7 +5,12 @@
 #define strtoll   _strtoi64
 #define	strdup		_strdup
 #define	mode_t		int
-#define snprintf	_snprintf
+
+#ifdef _MSC_VER
+  #if _MSC_VER < 1900
+    #define snprintf	_snprintf
+  #endif
+#endif
 #define	PATH_MAX	MAX_PATH
 #define	fseeko		_fseeki64
 #define ftello		_ftelli64
@@ -23,7 +28,7 @@
 
 extern "C"
 {
-// Microsoft implementation of these structures has the 
+// Microsoft implementation of these structures has the
 // pointer and length in reversed positions.
 typedef struct iovec
 {

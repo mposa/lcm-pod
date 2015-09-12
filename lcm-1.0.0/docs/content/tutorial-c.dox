@@ -23,7 +23,7 @@ After running this command, you should have two files:
 <tt>exlcm_example_t.c</tt> and <tt>exlcm_example_t.h</tt>.  These two files are
 the C bindings for the example message type.  Notice that the message type
 package name "exlcm" was prepended to the file name.  This is how LCM emulates
-namespaces in C, and the package name is also prefixed to the generated C struct name.  
+namespaces in C, and the package name is also prefixed to the generated C struct name.
 If you have the time, take a moment to open up those two files and inspect the generated code.
 
 \section tutorial_c_initialize Initializing LCM
@@ -61,13 +61,13 @@ see the API reference for lcm_create().
 
 Once you're all done, it's a good idea to call lcm_destroy() to clean
 up any resources used by LCM.
-    
+
 \section tutorial_c_publishing Publishing a message
 
 When you create an LCM data type and generate C code with <tt>lcm-gen</tt>,
 that data type will then be available as a C struct with the same name.  For
 <tt>example_t</tt>, the C struct that gets generated looks like this:
-    
+
 \code
 typedef struct _exlcm_example_t exlcm_example_t;
 struct _exlcm_example_t
@@ -84,9 +84,9 @@ struct _exlcm_example_t
 
 Notice here that fixed-length arrays in LCM appear as fixed-length C arrays.
 Variable length arrays appear as pointers in C.  More on that below.
-    
+
 We can instantiate and then publish some sample data as follows:
-    
+
 \code
 #include <lcm/lcm.h>
 #include "exlcm_example_t.h"
@@ -162,12 +162,12 @@ particular instance of LCM may have an unlimited number of subscriptions.
 #include "exlcm_example_t.h"
 
 static void
-my_handler(const lcm_recv_buf_t *rbuf, const char * channel, 
+my_handler(const lcm_recv_buf_t *rbuf, const char * channel,
         const exlcm_example_t * msg, void * user)
 {
     int i;
     printf("Received message on channel \"%s\":\n", channel);
-    printf("  timestamp   = %"PRId64"\n", msg->timestamp);
+    printf("  timestamp   = %" PRId64 "\n", msg->timestamp);
     printf("  position    = (%f, %f, %f)\n",
             msg->position[0], msg->position[1], msg->position[2]);
     printf("  orientation = (%f, %f, %f, %f)\n",

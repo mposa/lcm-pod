@@ -45,7 +45,7 @@ int main(int argc, char ** argv)
         exlcm_example_t_decode(event->data, 0, event->datalen, &msg);
 
         printf("Message:\n");
-        printf("  timestamp   = %"PRId64"\n", msg.timestamp);
+        printf("  timestamp   = %" PRId64 "\n", msg.timestamp);
         printf("  position    = (%f, %f, %f)\n",
                 msg.position[0], msg.position[1], msg.position[2]);
         printf("  orientation = (%f, %f, %f, %f)\n",

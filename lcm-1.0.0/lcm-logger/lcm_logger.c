@@ -251,7 +251,7 @@ write_thread(void *user_data)
 
             double tps =  logger->events_since_last_report / dt;
             double kbps = (logger->logsize - logger->last_report_logsize) / dt / 1024.0;
-            printf("Summary: %s ti:%4"PRIi64"sec Events: %-9"PRIi64" ( %4"PRIi64" MB )      TPS: %8.2f       KB/s: %8.2f\n",
+            printf("Summary: %s ti:%4" PRIi64 "sec Events: %-9" PRIi64 " ( %4" PRIi64 " MB )      TPS: %8.2f       KB/s: %8.2f\n",
                     logger->fname,
                     timestamp_seconds(offset_utime),
                     logger->nevents, logger->logsize/1048576,
