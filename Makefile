@@ -12,7 +12,7 @@ endif
 
 .PHONY: all
 all: configure
-	cmake --build lcm-1.0.0/pod-build $(CMAKE_CONFIG)
+	cmake --build lcm-1.0.0/pod-build $(CMAKE_CONFIG) --target install
 
 lcm-1.0.0/pod-build:
 	@-mkdir lcm-1.0.0/pod-build
