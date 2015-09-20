@@ -41,7 +41,7 @@ clean:
 	@-rm -rf build
 
 # other (custom) targets are passed through to the cmake-generated Makefile
-%:: configure
+%::
 	cmake --build lcm-1.0.0/pod-build $(CMAKE_CONFIG) --target $@
 
 # Default to a less-verbose build.  If you want all the gory compiler output,
