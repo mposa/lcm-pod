@@ -3,10 +3,12 @@ import time
 import array
 import random
 import select
+import unittest
 
 import lcm
 
 import lcmtest
+import lcmtest2
 
 def _lcm_handle_timeout(lc, ms):
     try:
@@ -19,15 +21,56 @@ def _lcm_handle_timeout(lc, ms):
         return False
 
 def info(txt):
-    sys.stderr.write("client: %s\n" % txt)
+    sys.stderr.write("py_client: %s\n" % txt)
 
 def check_field(actual, expected, field):
     if actual != expected:
         raise ValueError("reply.%s : Expected %s, got %s" % (field, actual, expected))
 
+class AnotherTypeTest(object):
+    def get_message_type(self):
+        return lcmtest2.another_type_t
+
+    def get_message_package(self):
+        return "lcmtest2"
+
+    def get_num_iters(self):
+        return 100
+
+    def make_message(self, iteration):
+        msg = lcmtest2.another_type_t()
+        msg.val = iteration
+        return msg
+
+    def check_reply(self, reply, iteration):
+        check_field(reply.val, iteration, "val")
+
+class CrossPackageTest(object):
+    def get_message_type(self):
+        return lcmtest2.cross_package_t
+
+    def get_message_package(self):
+        return "lcmtest2"
+
+    def get_num_iters(self):
+        return 100
+
+    def make_message(self, iteration):
+        msg = lcmtest2.cross_package_t()
+        msg.primitives = PrimitivesTest().make_message(iteration)
+        msg.another = AnotherTypeTest().make_message(iteration)
+        return msg
+
+    def check_reply(self, reply, iteration):
+        PrimitivesTest().check_reply(reply.primitives, iteration)
+        AnotherTypeTest().check_reply(reply.another, iteration)
+
 class MultidimArrayTest(object):
     def get_message_type(self):
         return lcmtest.multidim_array_t
+
+    def get_message_package(self):
+        return "lcmtest"
 
     def get_num_iters(self):
         return 5
@@ -81,6 +124,9 @@ class NodeTest(object):
     def get_message_type(self):
         return lcmtest.node_t
 
+    def get_message_package(self):
+        return "lcmtest"
+
     def get_num_iters(self):
         return 7
 
@@ -100,6 +146,9 @@ class NodeTest(object):
 class PrimitivesListTest(object):
     def get_message_type(self):
         return lcmtest.primitives_list_t
+
+    def get_message_package(self):
+        return "lcmtest"
 
     def get_num_iters(self):
         return 100
@@ -151,6 +200,9 @@ class PrimitivesTest(object):
     def get_message_type(self):
         return lcmtest.primitives_t
 
+    def get_message_package(self):
+        return "lcmtest"
+
     def get_num_iters(self):
         return 1000
 
@@ -185,7 +237,7 @@ class PrimitivesTest(object):
         check_field(reply.orientation[1], float(n), "orientation[1]");
         check_field(reply.orientation[2], float(n), "orientation[2]");
         check_field(reply.orientation[3], float(n), "orientation[3]");
-        check_field(reply.num_ranges, n, "%d");
+        check_field(reply.num_ranges, n, "num_ranges");
         for i in range(n):
             check_field(reply.ranges[i], i, "ranges[%d]" % i)
         check_field(reply.name, "%d" % n, "name")
@@ -203,28 +255,29 @@ class StandardTester(object):
         try:
             self.test.check_reply(self.msg_type.decode(data), self.iteration + 1)
             self.response_count += 1
-        except ValueError, xcp:
+        except ValueError as xcp:
             self.failed = True
             info(str(xcp))
 
     def run(self):
         self.response_count = 0
-        pub_channel = "test_lcmtest_%s" % self.msg_name
-        subs = self.lc.subscribe("test_lcmtest_%s_reply" % self.msg_name, self.handler)
+        pkg_name = self.test.get_message_package()
+        pub_channel = "test_%s_%s" % (pkg_name, self.msg_name)
+        subs = self.lc.subscribe("test_%s_%s_reply" % (pkg_name, self.msg_name), self.handler)
         for iteration in range(self.test.get_num_iters()):
             self.iteration = iteration
             msg = self.test.make_message(iteration)
             self.lc.publish(pub_channel, msg.encode())
 
             if not _lcm_handle_timeout(self.lc, 500):
-                info("%-17s : Timeout waiting for reply (iteration %d)" % (self.msg_name, iteration));
+                info("%-20s : Timeout waiting for reply (iteration %d)" % (self.msg_name, iteration));
                 return False
             elif self.failed:
-                info("%-17s : Error on iteration %d" % (self.msg_name, iteration))
+                info("%-20s : Error on iteration %d" % (self.msg_name, iteration))
                 return False
 
         self.lc.unsubscribe(subs)
-        info("lcmtest_%-17s : PASSED" % self.msg_name)
+#        info("%-31s : PASSED" % (pkg_name + "_" + self.msg_name))
         return True
 
 
@@ -251,21 +304,31 @@ class EchoTester(object):
             if not _lcm_handle_timeout(self.lc, 500) or self.response_count != i + 1:
                 print("echo test failed to receive a response on iteration %d" % i)
                 raise RuntimeError()
-        info("%-25s : PASSED" % "echo test")
+#        info("%-31s : PASSED" % "echo test")
         self.lc.unsubscribe(self.subs)
 
-class Tester(object):
-    def __init__(self):
+class ClientTest(unittest.TestCase):
+    def setUp(self):
+        random.seed()
         self.lc = lcm.LCM()
 
-    def run(self):
+    def test_1_echo(self):
         EchoTester(self.lc).run()
-        StandardTester(self.lc, PrimitivesTest()).run()
-        StandardTester(self.lc, PrimitivesListTest()).run()
-        StandardTester(self.lc, NodeTest()).run()
-        StandardTester(self.lc, MultidimArrayTest()).run()
-        info("All tests passed")
 
-if __name__ == "__main__":
-    random.seed()
-    Tester().run()
+    def test_2_primitives_t(self):
+        StandardTester(self.lc, PrimitivesTest()).run()
+
+    def test_3_primitives_list_t(self):
+        StandardTester(self.lc, PrimitivesListTest()).run()
+
+    def test_4_node_t(self):
+        StandardTester(self.lc, NodeTest()).run()
+
+    def test_5_multidim_array_t(self):
+        StandardTester(self.lc, MultidimArrayTest()).run()
+
+    def test_6_cross_package(self):
+        StandardTester(self.lc, CrossPackageTest()).run()
+
+if __name__ == '__main__':
+    unittest.main()

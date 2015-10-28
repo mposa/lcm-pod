@@ -11,6 +11,14 @@
 #include "lcm_internal.h"
 #include "dbg.h"
 
+#ifdef WIN32
+#include "windows/WinPorting.h"
+#include <winsock2.h>
+#else
+#include <sys/select.h>
+typedef int SOCKET;
+#endif
+
 #define LCM_DEFAULT_URL "udpm://239.255.76.67:7667?ttl=0"
 
 struct _lcm_t {
@@ -33,11 +41,7 @@ struct _lcm_subscription_t {
     lcm_msg_handler_t  handler;
     void             *userdata;
     lcm_t* lcm;
-#ifdef USE_GREGEX
     GRegex * regex;
-#else
-    regex_t preg;
-#endif
     int callback_scheduled;
     int marked_for_deletion;
 
@@ -48,6 +52,8 @@ struct _lcm_subscription_t {
 extern void lcm_udpm_provider_init (GPtrArray * providers);
 extern void lcm_logprov_provider_init (GPtrArray * providers);
 extern void lcm_tcpq_provider_init (GPtrArray * providers);
+extern void lcm_mpudpm_provider_init(GPtrArray * providers);
+extern void lcm_memq_provider_init(GPtrArray * providers);
 
 lcm_t * 
 lcm_create (const char *url)
@@ -55,11 +61,11 @@ lcm_create (const char *url)
     if (!g_thread_supported ()) g_thread_init (NULL);
 
 #ifdef WIN32
-	WSADATA	wsd;
+    WSADATA    wsd;
     int status = WSAStartup ( MAKEWORD ( 2, 0 ), &wsd );
     if ( status )
     {
-		return NULL;
+        return NULL;
     }
 #endif
 
@@ -74,6 +80,8 @@ lcm_create (const char *url)
     lcm_udpm_provider_init (providers);
     lcm_logprov_provider_init (providers);
     lcm_tcpq_provider_init (providers);
+    lcm_mpudpm_provider_init (providers);
+    lcm_memq_provider_init (providers);
     if (providers->len == 0) {
         fprintf (stderr, "Error: no LCM providers found\n");
         goto fail;
@@ -161,11 +169,7 @@ static void
 lcm_handler_free (lcm_subscription_t *h) 
 {
     assert (!h->callback_scheduled);
-#ifdef USE_GREGEX
     g_regex_unref(h->regex);
-#else
-    regfree(&h->preg);
-#endif
     free (h->channel);
     memset (h, 0, sizeof (lcm_subscription_t));
     free (h);
@@ -174,14 +178,21 @@ lcm_handler_free (lcm_subscription_t *h)
 void
 lcm_destroy (lcm_t * lcm)
 {
-    if (lcm->provider)
+    if (lcm->provider){
+        for (unsigned int i = 0; i < lcm->handlers_all->len; i++) {
+            // unsubscribe from all handlers
+            lcm_subscription_t *h = (lcm_subscription_t *) g_ptr_array_index(
+                    lcm->handlers_all, i);
+            lcm_unsubscribe(lcm, h);
+        }
         lcm->vtable->destroy (lcm->provider);
-    
+    }
     g_hash_table_foreach (lcm->handlers_map, map_free_handlers_callback, NULL);
     g_hash_table_destroy (lcm->handlers_map);
 
     for (unsigned int i = 0; i < lcm->handlers_all->len; i++) {
-        lcm_subscription_t *h = (lcm_subscription_t *) g_ptr_array_index(lcm->handlers_all, i);
+        lcm_subscription_t *h = (lcm_subscription_t *) g_ptr_array_index(
+                lcm->handlers_all, i);
         h->callback_scheduled = 0; // XXX hack...
         lcm_handler_free(h);
     }
@@ -211,6 +222,33 @@ lcm_handle (lcm_t * lcm)
 }
 
 int
+lcm_handle_timeout (lcm_t *lcm, int timeout_milis)
+{
+  fd_set fds;
+  FD_ZERO(&fds);
+  SOCKET lcm_fd = lcm_get_fileno(lcm);
+  FD_SET(lcm_fd, &fds);
+
+  struct timeval timeout;
+  timeout.tv_sec = timeout_milis / 1000;
+  timeout.tv_usec = (timeout_milis % 1000) * 1000;
+
+  if (timeout_milis < 0) {
+      return -1;
+  }
+
+  int select_result = select(lcm_fd + 1, &fds, NULL, NULL, &timeout);
+  if (select_result > 0) {
+      int lcm_handle_result = lcm_handle(lcm);
+      return lcm_handle_result == 0 ? 1 : lcm_handle_result;
+  } else if (select_result == 0) {
+      return 0;
+  } else {
+      return select_result;
+  }
+}
+
+int
 lcm_get_fileno (lcm_t * lcm)
 {
     if (lcm->provider && lcm->vtable->get_fileno)
@@ -232,11 +270,7 @@ lcm_publish (lcm_t *lcm, const char *channel, const void *data,
 static int 
 is_handler_subscriber(lcm_subscription_t *h, const char *channel_name)
 {
-#ifdef USE_GREGEX
     return g_regex_match(h->regex, channel_name, (GRegexMatchFlags) 0, NULL);
-#else 
-    return (0 == regexec(&h->preg, channel_name, 0, NULL, 0));
-#endif
 }
 
 // add the handler to any channel's handler list if its subscription matches
@@ -287,7 +321,6 @@ lcm_subscription_t
     h->lcm = lcm;
 
     char *regexbuf = g_strdup_printf("^%s$", channel);
-#ifdef USE_GREGEX
     GError *rerr = NULL;
     h->regex = g_regex_new(regexbuf, (GRegexCompileFlags) 0, (GRegexMatchFlags) 0, &rerr);
     g_free(regexbuf);
@@ -298,16 +331,6 @@ lcm_subscription_t
         free(h);
         return NULL;
     }
-#else
-    int rstatus = regcomp (&h->preg, regexbuf, REG_NOSUB | REG_EXTENDED);
-    g_free(regexbuf);
-    if (rstatus != 0) {
-        dbg (DBG_LCM, "bad regex in channel name!\n");
-        free (h);
-        return NULL;
-    }
-#endif
-
     g_static_rec_mutex_lock (&lcm->mutex);
     g_ptr_array_add(lcm->handlers_all, h);
     g_hash_table_foreach(lcm->handlers_map, map_add_handler_callback, h);
@@ -466,7 +489,7 @@ lcm_parse_url (const char * url, char ** provider, char ** network,
     
     *provider = strdup (provider_networkargs[0]);
 
-    char **network_args = g_strsplit (provider_networkargs[1], "?", 2);
+    char **network_args = g_strsplit (provider_networkargs[1], "?", 0);
 
     if (network_args[0]) {
         *network = strdup (network_args[0]);
@@ -475,18 +498,21 @@ lcm_parse_url (const char * url, char ** provider, char ** network,
     }
 
     if (network_args[0] && network_args[1]) {
-        // parse the args
-        char ** split_args = g_strsplit (network_args[1], "&", -1);
+        for (char ** option_arg = network_args + 1; *option_arg != NULL ;
+                option_arg++) {
+            // parse the args
+            char ** split_args = g_strsplit(*option_arg, "&", -1);
 
-        for (int i = 0; split_args[i]; i++) {
-            char ** key_value = g_strsplit (split_args[i], "=", 2);
-            if (key_value[0] && strlen (key_value[0])) {
-                g_hash_table_replace (args, strdup (key_value[0]),
-                        key_value[1] ? strdup (key_value[1]) : strdup (""));
+            for (int i = 0; split_args[i]; i++) {
+                char ** key_value = g_strsplit(split_args[i], "=", 2);
+                if (key_value[0] && strlen(key_value[0])) {
+                    g_hash_table_replace(args, strdup(key_value[0]),
+                            key_value[1] ? strdup(key_value[1]) : strdup(""));
+                }
+                g_strfreev(key_value);
             }
-            g_strfreev (key_value);
+            g_strfreev(split_args);
         }
-        g_strfreev (split_args);
     }
 
     g_strfreev (provider_networkargs);

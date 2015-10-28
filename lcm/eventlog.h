@@ -21,7 +21,9 @@ extern "C" {
  * @ingroup LcmC
  * @brief Read and write %LCM log files
  *
- * <tt> #include <lcm/lcm.h> </tt>
+ * @code
+ * #include <lcm/lcm.h>
+ * @endcode
  *
  * Linking: <tt> `pkg-config --libs lcm` </tt>
  *
@@ -32,13 +34,12 @@ typedef struct _lcm_eventlog_t lcm_eventlog_t;
 struct _lcm_eventlog_t
 {
     /**
-     * The underlying file handle.  Use this at your own risk.  Example use
-     * cases include implementing your own seek routine for read-mode logs, or
-     * rewinding the file pointer to the beginning of the log file.
+     * The underlying file handle.  Made available for debugging.
      */
     FILE *f;
+
     /**
-     * Do not use.
+     * Internal counter, keeps track of how many events have been written.
      */
     int64_t eventcount;
 };
@@ -81,7 +82,7 @@ struct _lcm_eventlog_event_t {
  * Open a log file for reading or writing.
  *
  * @param path Log file to open
- * @param mode "r" (read mode) or "w" (write mode)
+ * @param mode "r" (read mode), "w" (write mode), or "a" (append mode)
  *
  * @return a newly allocated lcm_eventlog_t, or NULL on failure.
  */
@@ -94,8 +95,8 @@ lcm_eventlog_t *lcm_eventlog_create(const char *path, const char *mode);
  *
  * @param eventlog The log file object
  *
- * @return the next event in the log file, or NULL when the end of the file has
- * been reached.
+ * @return the next event in the log file.  Returns NULL when the end of the
+ * file has been reached or when invalid data is read.
  */
 LCM_API_FUNCTION
 lcm_eventlog_event_t *lcm_eventlog_read_next_event(lcm_eventlog_t *eventlog);

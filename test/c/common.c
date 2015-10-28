@@ -18,30 +18,39 @@ typedef int SOCKET;
         return 0; \
     }
 
-int
-_lcm_handle_timeout(lcm_t* lcm, int ms)
+#if defined(_MSC_VER) && _MSC_VER < 1900
+
+#define snprintf c99_snprintf
+#define vsnprintf c99_vsnprintf
+
+inline int c99_vsnprintf(char *outBuf, size_t size, const char *format, va_list ap)
 {
-    // setup the LCM file descriptor for waiting.
-    SOCKET lcm_fd = lcm_get_fileno(lcm);
-    fd_set fds;
-    FD_ZERO(&fds);
-    FD_SET(lcm_fd, &fds);
+    int count = -1;
 
-    // wait a limited amount of time for an incoming message
-    struct timeval timeout = {
-        ms / 1000,           // seconds
-        (ms % 1000) * 1000   // microseconds
-    };
-    int status = select(lcm_fd + 1, &fds, 0, 0, &timeout);
-    if(status > 0 && FD_ISSET(lcm_fd, &fds)) {
-        lcm_handle(lcm);
-        return 1;
-    }
+    if (size != 0)
+        count = _vsnprintf_s(outBuf, size, _TRUNCATE, format, ap);
+    if (count == -1)
+        count = _vscprintf(format, ap);
 
-    // no messages
-    return 0;
+    return count;
 }
 
+inline int c99_snprintf(char *outBuf, size_t size, const char *format, ...)
+{
+    int count;
+    va_list ap;
+
+    va_start(ap, format);
+    count = c99_vsnprintf(outBuf, size, format, ap);
+    va_end(ap);
+
+    return count;
+}
+
+#endif
+
+// Avoid clashing with predefined _strdup
+#ifndef _MSC_VER
 char*
 _strdup(const char* src)
 {
@@ -50,6 +59,7 @@ _strdup(const char* src)
     memcpy(result, src, len+1);
     return result;
 }
+#endif
 
 int
 check_lcmtest_multidim_array_t(const lcmtest_multidim_array_t* msg, int expected)
@@ -143,6 +153,7 @@ clear_lcmtest_multidim_array_t(lcmtest_multidim_array_t* msg)
         }
         free(msg->strarray[i]);
     }
+    free(msg->strarray);
 }
 
 int
@@ -224,7 +235,6 @@ fill_lcmtest_primitives_list_t(int num, lcmtest_primitives_list_t* msg)
     msg->items = (lcmtest_primitives_t*) malloc(msg->num_items * sizeof(lcmtest_primitives_t));
     for(n=0; n<num; n++) {
         lcmtest_primitives_t* ex = &msg->items[n];
-        ex->ranges = (int16_t*) malloc(n * sizeof(int16_t));
         ex->i8 = -(n % 100);
         ex->i16 = -n * 10;
         ex->i64 = -n * 10000;
@@ -318,3 +328,61 @@ clear_lcmtest_primitives_t(lcmtest_primitives_t* msg)
     free(msg->name);
 }
 
+int
+check_lcmtest2_cross_package_t(const lcmtest2_cross_package_t* msg, int expected)
+{
+    return check_lcmtest_primitives_t(&msg->primitives, expected) &&
+        check_lcmtest2_another_type_t(&msg->another, expected);
+}
+
+void
+fill_lcmtest2_cross_package_t(int n, lcmtest2_cross_package_t* msg)
+{
+    fill_lcmtest_primitives_t(n, &msg->primitives);
+    fill_lcmtest2_another_type_t(n, &msg->another);
+}
+
+void
+clear_lcmtest2_cross_package_t(lcmtest2_cross_package_t* msg)
+{
+    clear_lcmtest_primitives_t(&msg->primitives);
+    clear_lcmtest2_another_type_t(&msg->another);
+}
+
+int
+check_lcmtest2_another_type_t(const lcmtest2_another_type_t* msg, int expected)
+{
+    int n = expected;
+    CHECK_FIELD(msg->val, n, "%d");
+    return 1;
+}
+
+void
+fill_lcmtest2_another_type_t(int n, lcmtest2_another_type_t* msg)
+{
+    msg->val = n;
+}
+
+void
+clear_lcmtest2_another_type_t(lcmtest2_another_type_t* msg)
+{
+    return;
+}
+
+char*
+make_tmpnam()
+{
+#ifndef WIN32
+    return tmpnam(NULL);
+#else
+    return _tempnam(NULL, NULL);
+#endif
+}
+
+void
+free_tmpnam(char* tmpnam)
+{
+#ifdef WIN32
+    free(tmpnam);
+#endif
+}

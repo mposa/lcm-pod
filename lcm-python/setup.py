@@ -1,19 +1,27 @@
-import commands
+import subprocess
 from distutils.core import setup, Extension
 from distutils import msvccompiler
 import os
+import sys
 
 sources = [ \
     "module.c",
     "pyeventlog.c",
     "pylcm.c",
     "pylcm_subscription.c",
+    os.path.join("..", "lcm", "eventlog.c"),
     os.path.join("..", "lcm", "lcm.c"),
-    os.path.join("..", "lcm", "lcm_udp.c"),
     os.path.join("..", "lcm", "lcm_file.c"),
+    os.path.join("..", "lcm", "lcm_memq.c"),
+    os.path.join("..", "lcm", "lcm_mpudpm.c"),
     os.path.join("..", "lcm", "lcm_tcpq.c"),
+    os.path.join("..", "lcm", "lcmtypes", "channel_port_map_update_t.c"),
+    os.path.join("..", "lcm", "lcmtypes", "channel_to_port_t.c"),
+    os.path.join("..", "lcm", "lcm_udpm.c"),
     os.path.join("..", "lcm", "ringbuffer.c"),
-    os.path.join("..", "lcm", "eventlog.c") ]
+    os.path.join("..", "lcm", "udpm_util.c")
+    ]
+
 
 include_dirs = []
 define_macros = []
@@ -51,25 +59,25 @@ if os.name == 'nt':
     msvccompiler.MSVCCompiler._c_extensions = []
     msvccompiler.MSVCCompiler._cpp_extensions.append('.c')
 
-    sources.append(os.path.join("..", "WinSpecific", "WinPorting.cpp"))
+    sources.append(os.path.join("..", "lcm", "windows", "WinPorting.cpp"))
 
 else:
     pkg_deps = "glib-2.0 gthread-2.0"
 
     # include path
-    pkgconfig_include_flags = commands.getoutput("pkg-config --cflags-only-I")
+    pkgconfig_include_flags = subprocess.check_output( ["pkg-config", "--cflags-only-I", pkg_deps] ).decode(sys.stdout.encoding)
     include_dirs = [ t[2:] for t in pkgconfig_include_flags.split() ]
 
     # libraries
-    pkgconfig_lflags = commands.getoutput("pkg-config --libs-only-l %s" % pkg_deps)
+    pkgconfig_lflags = subprocess.check_output( ["pkg-config", "--libs-only-l", pkg_deps] ).decode(sys.stdout.encoding)
     libraries = [ t[2:] for t in pkgconfig_lflags.split() ]
 
     # link directories
-    pkgconfig_biglflags = commands.getoutput("pkg-config --libs-only-L %s" % pkg_deps)
+    pkgconfig_biglflags = subprocess.check_output( ["pkg-config", "--libs-only-L", pkg_deps ] ).decode(sys.stdout.encoding)
     library_dirs = [ t[2:] for t in pkgconfig_biglflags.split() ]
 
     # other compiler flags
-    pkgconfig_cflags = commands.getoutput("pkg-config --cflags %s" % pkg_deps).split()
+    pkgconfig_cflags = subprocess.check_output( ["pkg-config", "--cflags", pkg_deps] ).decode(sys.stdout.encoding).split()
     extra_compile_args = [ \
         '-Wno-strict-prototypes',
         "-D_FILE_OFFSET_BITS=64",
@@ -84,6 +92,6 @@ pylcm_extension = Extension("lcm._lcm",
         libraries=libraries,
         extra_compile_args=extra_compile_args)
 
-setup(name="lcm", version="1.0.0",
+setup(name="lcm", version="1.3.0",
       ext_modules=[pylcm_extension],
       packages=["lcm"])

@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="Windows-1252"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
-	Version="8,00"
+	Version="9.00"
 	Name="lcm-gen"
 	ProjectGUID="{4D2C4E6A-E658-480A-988A-B9CDF786D60F}"
 	RootNamespace="lcm-gen"
 	Keyword="Win32Proj"
+	TargetFrameworkVersion="131072"
 	>
 	<Platforms>
 		<Platform
@@ -66,6 +67,8 @@
 				AdditionalLibraryDirectories="$(GLIB_PATH)\lib"
 				GenerateDebugInformation="true"
 				SubSystem="1"
+				RandomizedBaseAddress="1"
+				DataExecutionPrevention="0"
 				TargetMachine="1"
 			/>
 			<Tool
@@ -87,9 +90,6 @@
 				Name="VCAppVerifierTool"
 			/>
 			<Tool
-				Name="VCWebDeploymentTool"
-			/>
-			<Tool
 				Name="VCPostBuildEventTool"
 			/>
 		</Configuration>
@@ -100,6 +100,7 @@
 			ConfigurationType="1"
 			CharacterSet="2"
 			WholeProgramOptimization="1"
+			BuildLogFile="$(IntDir)\BuildLog-lcm-gen.htm"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -144,6 +145,8 @@
 				SubSystem="1"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
+				RandomizedBaseAddress="1"
+				DataExecutionPrevention="0"
 				TargetMachine="1"
 			/>
 			<Tool
@@ -163,9 +166,6 @@
 			/>
 			<Tool
 				Name="VCAppVerifierTool"
-			/>
-			<Tool
-				Name="VCWebDeploymentTool"
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
@@ -261,7 +261,7 @@
 				</FileConfiguration>
 			</File>
 			<File
-				RelativePath=".\emit_python.c"
+				RelativePath=".\emit_lua.c"
 				>
 				<FileConfiguration
 					Name="Debug|Win32"
@@ -281,7 +281,7 @@
 				</FileConfiguration>
 			</File>
 			<File
-				RelativePath=".\emit_lua.c"
+				RelativePath=".\emit_python.c"
 				>
 				<FileConfiguration
 					Name="Debug|Win32"
@@ -361,26 +361,6 @@
 				</FileConfiguration>
 			</File>
 			<File
-				RelativePath=".\sprintfalloc.c"
-				>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						CompileAs="2"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						CompileAs="2"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
 				RelativePath=".\tokenize.c"
 				>
 				<FileConfiguration
@@ -412,10 +392,6 @@
 			</File>
 			<File
 				RelativePath=".\lcmgen.h"
-				>
-			</File>
-			<File
-				RelativePath=".\sprintfalloc.h"
 				>
 			</File>
 			<File

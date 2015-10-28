@@ -12,14 +12,14 @@ extern "C" {
 
 union float_uint32
 {
-	float     f;
-	uint32_t  i;
+    float     f;
+    uint32_t  i;
 };
 
 union double_uint64
 {
-	double    f;
-	uint64_t  i;
+    double    f;
+    uint64_t  i;
 };
 
 typedef struct ___lcm_hash_ptr __lcm_hash_ptr;
@@ -144,8 +144,12 @@ static inline int __int16_t_encode_array(void *_buf, int offset, int maxlen, con
     if (maxlen < total_size)
         return -1;
 
+    //  See Section 5.8 paragraph 3 of the standard
+    //  http://open-std.org/JTC1/SC22/WG21/docs/papers/2015/n4527.pdf
+    //  use uint for shifting instead if int
+    const uint16_t *unsigned_p = (uint16_t*)p;
     for (element = 0; element < elements; element++) {
-        int16_t v = p[element];
+        uint16_t v = unsigned_p[element];
         buf[pos++] = (v>>8) & 0xff;
         buf[pos++] = (v & 0xff);
     }
@@ -200,8 +204,12 @@ static inline int __int32_t_encode_array(void *_buf, int offset, int maxlen, con
     if (maxlen < total_size)
         return -1;
 
+    //  See Section 5.8 paragraph 3 of the standard
+    //  http://open-std.org/JTC1/SC22/WG21/docs/papers/2015/n4527.pdf
+    //  use uint for shifting instead if int
+    const uint32_t* unsigned_p = (uint32_t*)p;
     for (element = 0; element < elements; element++) {
-        int32_t v = p[element];
+        const uint32_t v = unsigned_p[element];
         buf[pos++] = (v>>24)&0xff;
         buf[pos++] = (v>>16)&0xff;
         buf[pos++] = (v>>8)&0xff;
@@ -221,8 +229,11 @@ static inline int __int32_t_decode_array(const void *_buf, int offset, int maxle
     if (maxlen < total_size)
         return -1;
 
+    //  See Section 5.8 paragraph 3 of the standard
+    //  http://open-std.org/JTC1/SC22/WG21/docs/papers/2015/n4527.pdf
+    //  use uint for shifting instead if int
     for (element = 0; element < elements; element++) {
-        p[element] = (buf[pos+0]<<24) + (buf[pos+1]<<16) + (buf[pos+2]<<8) + buf[pos+3];
+        p[element] = (((uint32_t)buf[pos+0])<<24) + (((uint32_t)buf[pos+1])<<16) + (((uint32_t)buf[pos+2])<<8) + ((uint32_t)buf[pos+3]);
         pos+=4;
     }
 
@@ -258,8 +269,12 @@ static inline int __int64_t_encode_array(void *_buf, int offset, int maxlen, con
     if (maxlen < total_size)
         return -1;
 
+    //  See Section 5.8 paragraph 3 of the standard
+    //  http://open-std.org/JTC1/SC22/WG21/docs/papers/2015/n4527.pdf
+    //  use uint for shifting instead if int
+    const uint64_t * unsigned_p = (uint64_t*)p;
     for (element = 0; element < elements; element++) {
-        int64_t v = p[element];
+        const uint64_t v = unsigned_p[element];
         buf[pos++] = (v>>56)&0xff;
         buf[pos++] = (v>>48)&0xff;
         buf[pos++] = (v>>40)&0xff;
@@ -283,10 +298,13 @@ static inline int __int64_t_decode_array(const void *_buf, int offset, int maxle
     if (maxlen < total_size)
         return -1;
 
+    //  See Section 5.8 paragraph 3 of the standard
+    //  http://open-std.org/JTC1/SC22/WG21/docs/papers/2015/n4527.pdf
+    //  use uint for shifting instead if int
     for (element = 0; element < elements; element++) {
-        int64_t a = (buf[pos+0]<<24) + (buf[pos+1]<<16) + (buf[pos+2]<<8) + buf[pos+3];
+        uint64_t a = (((uint32_t)buf[pos+0])<<24) + (((uint32_t)buf[pos+1])<<16) + (((uint32_t)buf[pos+2])<<8) + (uint32_t)buf[pos+3];
         pos+=4;
-        int64_t b = (buf[pos+0]<<24) + (buf[pos+1]<<16) + (buf[pos+2]<<8) + buf[pos+3];
+        uint64_t b = (((uint32_t)buf[pos+0])<<24) + (((uint32_t)buf[pos+1])<<16) + (((uint32_t)buf[pos+2])<<8) + (uint32_t)buf[pos+3];
         pos+=4;
         p[element] = (a<<32) + (b&0xffffffff);
     }
@@ -392,7 +410,7 @@ static inline int __string_encode_array(void *_buf, int offset, int maxlen, char
     int element;
 
     for (element = 0; element < elements; element++) {
-        int length = strlen(p[element]) + 1; // length includes \0
+        int32_t length = strlen(p[element]) + 1; // length includes \0
 
         thislen = __int32_t_encode_array(_buf, offset + pos, maxlen - pos, &length, 1);
         if (thislen < 0) return thislen; else pos += thislen;
@@ -410,7 +428,7 @@ static inline int __string_decode_array(const void *_buf, int offset, int maxlen
     int element;
 
     for (element = 0; element < elements; element++) {
-        int length;
+        int32_t length;
 
         // read length including \0
         thislen = __int32_t_decode_array(_buf, offset + pos, maxlen - pos, &length, 1);
@@ -442,6 +460,97 @@ static inline void *lcm_malloc(size_t sz)
         return malloc(sz);
     return NULL;
 }
+
+/**
+ * Describes the type of a single field in an LCM message.
+ */
+typedef enum {
+    LCM_FIELD_INT8_T,
+    LCM_FIELD_INT16_T,
+    LCM_FIELD_INT32_T,
+    LCM_FIELD_INT64_T,
+    LCM_FIELD_BYTE,
+    LCM_FIELD_FLOAT,
+    LCM_FIELD_DOUBLE,
+    LCM_FIELD_STRING,
+    LCM_FIELD_BOOLEAN,
+    LCM_FIELD_USER_TYPE
+} lcm_field_type_t;
+
+#define LCM_TYPE_FIELD_MAX_DIM 50
+
+/**
+ * Describes a single lcmtype field's datatype and array dimmensions
+ */
+typedef struct _lcm_field_t lcm_field_t;
+struct _lcm_field_t
+{
+    /**
+     * name of the field
+     */
+    const char *name;
+
+    /**
+     * datatype of the field
+     **/
+    lcm_field_type_t type;
+
+    /**
+     * datatype of the field (in string format)
+     * this should be the same as in the lcm type decription file
+     */
+    const char *typestr;
+
+    /**
+     * number of array dimensions
+     * if the field is scalar, num_dim should equal 0
+     */
+    int num_dim;
+
+    /**
+     * the size of each dimension. Valid on [0:num_dim-1].
+     */
+    int32_t dim_size[LCM_TYPE_FIELD_MAX_DIM];
+
+    /**
+     * a boolean describing whether the dimension is
+     * variable. Valid on [0:num_dim-1].
+     */
+    int8_t  dim_is_variable[LCM_TYPE_FIELD_MAX_DIM];
+
+    /**
+     * a data pointer to the start of this field
+     */
+    void *data;
+};
+
+
+typedef int (*lcm_encode_t)(void *buf, int offset, int maxlen, const void *p);
+typedef int (*lcm_decode_t)(const void *buf, int offset, int maxlen, void *p);
+typedef int (*lcm_decode_cleanup_t)(void *p);
+typedef int (*lcm_encoded_size_t)(const void *p);
+typedef int (*lcm_struct_size_t)(void);
+typedef int (*lcm_num_fields_t)(void);
+typedef int (*lcm_get_field_t)(const void *p, int i, lcm_field_t *f);
+typedef int64_t (*lcm_get_hash_t)(void);
+
+/**
+ * Describes an lcmtype info, enabling introspection
+ */
+typedef struct _lcm_type_info_t lcm_type_info_t;
+struct _lcm_type_info_t
+{
+    lcm_encode_t          encode;
+    lcm_decode_t          decode;
+    lcm_decode_cleanup_t  decode_cleanup;
+    lcm_encoded_size_t    encoded_size;
+    lcm_struct_size_t     struct_size;
+    lcm_num_fields_t      num_fields;
+    lcm_get_field_t       get_field;
+    lcm_get_hash_t        get_hash;
+
+};
+
 
 #ifdef __cplusplus
 }
