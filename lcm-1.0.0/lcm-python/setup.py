@@ -29,7 +29,7 @@ if os.name == 'nt':
 
     include_dirs = [ \
             "..",
-            os.path.join("..", "WinSpecific\include"),
+            os.path.join("..", "WinSpecific", "include"),
             os.path.join("..", "WinSpecific"),
             os.path.join(glibPath, "include", "glib-2.0"),
             os.path.join(glibPath, "lib", "glib-2.0", "include") ]
@@ -51,7 +51,7 @@ if os.name == 'nt':
     msvccompiler.MSVCCompiler._c_extensions = []
     msvccompiler.MSVCCompiler._cpp_extensions.append('.c')
 
-    sources.append(os.path.join("..", "WinSpecific", "WinPorting.cpp"))
+    sources.append(os.path.join("..", "lcm", "windows", "WinPorting.cpp"))
 
 else:
     pkg_deps = "glib-2.0 gthread-2.0"

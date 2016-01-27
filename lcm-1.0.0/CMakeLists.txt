@@ -14,8 +14,8 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wreturn-type -Wuninitialized -Wunused-variable") # -Wunused-parameter")
 
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-  if (APPLE)  
-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")  
+  if (APPLE)
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
   endif()
 endif()
 
@@ -49,12 +49,9 @@ if (JAVA_FOUND)
 endif()
 
 find_package(PythonInterp)
-if (PYTHONINTERP_FOUND AND NOT WIN32)
+if (PYTHONINTERP_FOUND)
   add_subdirectory(lcm-python)
 endif()
 
 # todo: add "if lua" logic
 #add_subdirectory(lcm-lua)
-
-
-
