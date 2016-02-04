@@ -49,7 +49,7 @@ if (JAVA_FOUND)
 endif()
 
 find_package(PythonInterp)
-if (PYTHONINTERP_FOUND AND NOT WIN32)
+if (PYTHONINTERP_FOUND)
   add_subdirectory(lcm-python)
 endif()
 

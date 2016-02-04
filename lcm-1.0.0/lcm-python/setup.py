@@ -22,10 +22,16 @@ libraries = []
 extra_compile_args = []
 
 if os.name == 'nt':
-    # check for GLIB_PATH environment var, exit with error if not found
+    # if VS90COMNTOOLS is not set set it to the value of VS140COMNTOOLS
+    vs90tools = os.getenv('VS90COMNTOOLS')
+    if not vs90tools:
+        os.environ['VS90COMNTOOLS'] = os.getenv('VS140COMNTOOLS')
+    # check for GLIB_PATH environment var
+    # if not set assume we are in externals/lcm/lcm-version/pod-build
+    # and use that to get to externals/gtk/gtk3
     glibPath = os.getenv('GLIB_PATH')
     if not glibPath:
-        sys.exit('GLIB_PATH environment variable not set.')
+        glibPath = os.path.realpath(os.path.join("..", "..", "..", "gtk", "gtk3"))
 
     include_dirs = [ \
             "..",
@@ -51,7 +57,7 @@ if os.name == 'nt':
     msvccompiler.MSVCCompiler._c_extensions = []
     msvccompiler.MSVCCompiler._cpp_extensions.append('.c')
 
-    sources.append(os.path.join("..", "WinSpecific", "WinPorting.cpp"))
+    sources.append(os.path.join("..", "lcm", "windows", "WinPorting.cpp"))
 
 else:
     pkg_deps = "glib-2.0 gthread-2.0"
