@@ -13,7 +13,6 @@ set(xmlgraphics_jar ${CMAKE_CURRENT_SOURCE_DIR}/jchart2d-code/ext/xmlgraphics-co
 
 FILE(GLOB_RECURSE lcm_java_files lcm/*.java)
 FILE(GLOB_RECURSE jchart2d_files ${jchart2d_src_dir}/*.java)
-MESSAGE("Java Files: ${lcm_java_files}")
 
 add_jar(lcm-java
     SOURCES ${lcm_java_files} ${jchart2d_files}
