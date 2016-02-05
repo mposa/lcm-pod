@@ -49,7 +49,6 @@ if (JAVA_FOUND)
 endif()
 
 find_package(PythonInterp)
-message("hello ${PYTHONINTERP_FOUND}")
 if (PYTHONINTERP_FOUND)
   set(pythonOK TRUE)
   if(WIN32)
