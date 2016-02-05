@@ -140,7 +140,7 @@ LCM::~LCM() {
 }
 
 inline int
-LCM::publish(const std::string& channel, void *data, unsigned int datalen) {
+LCM::publish(const std::string& channel, const void *data, unsigned int datalen) {
     if(!this->lcm) {
         fprintf(stderr,
             "LCM instance not initialized.  Ignoring call to publish()\n");
@@ -160,23 +160,24 @@ LCM::publish(const std::string& channel, const MessageType *msg) {
     return status;
 }
 
-inline void
+inline int
 LCM::unsubscribe(Subscription *subscription) {
     if(!this->lcm) {
         fprintf(stderr,
             "LCM instance not initialized.  Ignoring call to unsubscribe()\n");
-        return;
+        return -1;
     }
     std::vector<Subscription*>::iterator iter;
     std::vector<Subscription*>::iterator eiter = subscriptions.end();
     for(iter=subscriptions.begin(); iter!= eiter; ++iter) {
         if(*iter == subscription) {
-            lcm_unsubscribe(lcm, subscription->c_subs);
+            int status = lcm_unsubscribe(lcm, subscription->c_subs);
             subscriptions.erase(iter);
             delete subscription;
-            break;
+            return status;
         }
     }
+    return -1;
 }
 
 inline int
@@ -197,6 +198,16 @@ LCM::handle() {
         return -1;
     }
     return lcm_handle(this->lcm);
+}
+
+inline int
+LCM::handleTimeout(int timeout_millis) {
+    if(!this->lcm) {
+        fprintf(stderr,
+            "LCM instance not initialized.  Ignoring call to handle()\n");
+        return -1;
+    }
+    return lcm_handle_timeout(this->lcm, timeout_millis);
 }
 
 template <class MessageType, class MessageHandlerClass>
@@ -344,4 +355,10 @@ LogFile::writeEvent(LogEvent* event)
     evt.channel = (char*) event->channel.c_str();
     evt.data = event->data;
     return lcm_eventlog_write_event(eventlog, &evt);
+}
+
+FILE*
+LogFile::getFilePtr()
+{
+    return eventlog->f;
 }

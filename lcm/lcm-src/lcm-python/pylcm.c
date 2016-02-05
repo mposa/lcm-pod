@@ -1,3 +1,4 @@
+#include <Python.h> // include first because it contains pre-processor defs
 #ifndef WIN32
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -9,13 +10,25 @@
 
 #include "pylcm.h"
 #include "pylcm_subscription.h"
+#include "../lcm/dbg.h"
 
 #ifndef Py_RETURN_NONE
 #define Py_RETURN_NONE  do { Py_INCREF( Py_None ); return Py_None; } while(0)
 #endif
 
 //#define dbg(...) fprintf (stderr, __VA_ARGS__)
-#define dbg(...) 
+//#define dbg(...) 
+
+// to support python 2.5 and earlier
+#ifndef Py_TYPE
+    #define Py_TYPE(ob) (((PyObject*)(ob))->ob_type)
+#endif
+
+// to support python 3 where all ints are long
+#if PY_MAJOR_VERSION >= 3
+    #define PyInt_FromLong PyLong_FromLong
+    #define PyInt_AsLong PyLong_AsLong
+#endif
 
 PyDoc_STRVAR (pylcm_doc,
 "The LCM class provides a connection to an LCM network.\n\
@@ -67,14 +80,27 @@ static void
 pylcm_msg_handler (const lcm_recv_buf_t *rbuf, const char *channel, 
         void *userdata)
 {
-    // if an exception has occurred, then abort.
-    if (PyErr_Occurred ()) return;
-	
-	//MSVC requires explicit cast
     PyLCMSubscriptionObject *subs_obj = (PyLCMSubscriptionObject*) userdata;
+    dbg(DBG_PYTHON, "%s %p %p\n", __FUNCTION__, subs_obj, subs_obj->lcm_obj);
 
-    PyObject *arglist = Py_BuildValue ("ss#", channel, 
+    // Restore the thread state before calling back into Python.
+    if (subs_obj->lcm_obj->saved_thread_state) {
+      PyEval_RestoreThread(subs_obj->lcm_obj->saved_thread_state);
+      subs_obj->lcm_obj->saved_thread_state = NULL;
+    }
+
+    // if an exception has occurred, then abort.
+    if (PyErr_Occurred ()) {
+      return;
+    }
+
+    #if PY_MAJOR_VERSION >= 3
+    PyObject *arglist = Py_BuildValue ("sy#", channel, // build from bytes
             rbuf->data, rbuf->data_size);
+    #else
+    PyObject *arglist = Py_BuildValue ("ss#", channel, // build from string
+            rbuf->data, rbuf->data_size);
+    #endif
 
     PyObject *result  = PyEval_CallObject (subs_obj->handler, arglist);
     Py_DECREF (arglist);
@@ -145,7 +171,7 @@ a binary string containing the raw message bytes.\n\
 static PyObject *
 pylcm_unsubscribe (PyLCMObject *lcm_obj, PyObject *args)
 {
-    dbg ("%s %p\n", __FUNCTION__, lcm_obj);
+    dbg(DBG_PYTHON, "%s %p\n", __FUNCTION__, lcm_obj);
     PyObject *_subs_obj = NULL;
     if (!PyArg_ParseTuple (args, "O!", &pylcm_subscription_type, 
                 &_subs_obj))
@@ -201,8 +227,8 @@ pylcm_publish (PyLCMObject *lcm_obj, PyObject *args)
         PyErr_SetString (PyExc_ValueError, "invalid channel");
         return NULL;
     }
-    int status;
 
+    int status;
     Py_BEGIN_ALLOW_THREADS
     status = lcm_publish (lcm_obj->lcm, channel, (uint8_t*)data, datalen);
     Py_END_ALLOW_THREADS
@@ -225,7 +251,7 @@ Publishes a message to an LCM network\n\
 static PyObject *
 pylcm_fileno (PyLCMObject *lcm_obj)
 {
-    dbg ("%s %p\n", __FUNCTION__, lcm_obj);
+    dbg(DBG_PYTHON, "%s %p\n", __FUNCTION__, lcm_obj);
     return PyInt_FromLong (lcm_get_fileno (lcm_obj->lcm));
 }
 PyDoc_STRVAR (pylcm_fileno_doc,
@@ -237,30 +263,32 @@ Returns a file descriptor suitable for use with select, poll, etc.\n\
 static PyObject *
 pylcm_handle (PyLCMObject *lcm_obj)
 {
-    dbg ("%s %p\n", __FUNCTION__, lcm_obj);
-    int fd = lcm_get_fileno (lcm_obj->lcm);
-    if(fd < 0) {
-      PyErr_SetFromErrno(PyExc_IOError);
-      return NULL;
-    }
-    fd_set fds;
-    FD_ZERO (&fds);
-    FD_SET (fd, &fds);
-    int status;
+    dbg(DBG_PYTHON, "pylcm_handle(%p)\n", lcm_obj);
 
-    Py_BEGIN_ALLOW_THREADS
-    status = select (fd+1, &fds, NULL, NULL, NULL);
-    Py_END_ALLOW_THREADS
-
-    if (status < 0) {
-        PyErr_SetFromErrno (PyExc_IOError);
+    if (lcm_obj->saved_thread_state) {
+        PyErr_SetString (PyExc_RuntimeError,
+            "only one thread is allowed to call LCM.handle() or LCM.handle_timeout() at a time");
         return NULL;
     }
-
-    // XXX how to properly use Py_{BEGIN,END}_ALLOW_THREADS here????
+    lcm_obj->saved_thread_state = PyEval_SaveThread();
     lcm_obj->exception_raised = 0;
-    lcm_handle (lcm_obj->lcm);
-    if (lcm_obj->exception_raised) return NULL;
+
+    dbg(DBG_PYTHON, "calling lcm_handle(%p)\n", lcm_obj->lcm);
+    int status = lcm_handle (lcm_obj->lcm);
+
+    // Restore the thread state before returning back to Python.  The thread
+    // state may have already been restored by the callback function
+    // pylcm_msg_handler()
+    if (lcm_obj->saved_thread_state) {
+      PyEval_RestoreThread(lcm_obj->saved_thread_state);
+      lcm_obj->saved_thread_state = NULL;
+    }
+
+    if (lcm_obj->exception_raised) { return NULL; }
+    if (status < 0) {
+        PyErr_SetString (PyExc_IOError, "lcm_handle() returned -1");
+        return NULL;
+    }
     Py_RETURN_NONE;
 }
 PyDoc_STRVAR (pylcm_handle_doc,
@@ -268,8 +296,63 @@ PyDoc_STRVAR (pylcm_handle_doc,
 waits for and dispatches the next incoming message\n\
 ");
 
+static PyObject *
+pylcm_handle_timeout (PyLCMObject *lcm_obj, PyObject *arg)
+{
+    int timeout_millis = PyInt_AsLong(arg);
+    if (timeout_millis == -1 && PyErr_Occurred())
+        return NULL;
+    if (timeout_millis < 0) {
+        PyErr_SetString (PyExc_ValueError, "invalid timeout");
+        return NULL;
+    }
+
+    dbg(DBG_PYTHON, "pylcm_handle_timeout(%p, %d)\n", lcm_obj, timeout_millis);
+
+    if (lcm_obj->saved_thread_state) {
+        PyErr_SetString (PyExc_RuntimeError,
+            "Simultaneous calls to handle() / handle_timeout() detected");
+        return NULL;
+    }
+    lcm_obj->saved_thread_state = PyEval_SaveThread();
+    lcm_obj->exception_raised = 0;
+
+    dbg(DBG_PYTHON, "calling lcm_handle_timeout(%p, %d)\n", lcm_obj->lcm,
+        timeout_millis);
+    int status = lcm_handle_timeout(lcm_obj->lcm, timeout_millis);
+
+    // Restore the thread state before returning back to Python.  The thread
+    // state may have already been restored by the callback function
+    // pylcm_msg_handler()
+    if (lcm_obj->saved_thread_state) {
+      PyEval_RestoreThread(lcm_obj->saved_thread_state);
+      lcm_obj->saved_thread_state = NULL;
+    }
+
+    if (lcm_obj->exception_raised) { return NULL; }
+    if (status < 0) {
+        PyErr_SetString (PyExc_IOError, "lcm_handle_timeout() returned -1");
+        return NULL;
+    }
+    return PyInt_FromLong(status);
+}
+PyDoc_STRVAR (pylcm_handle_timeout_doc,
+"handle_timeout(timeout_millis) -> int\n\
+New in LCM 1.1.0\n\
+\n\
+waits for and dispatches the next incoming message, with a timeout.\n\
+\n\
+Raises ValueError if @p timeout_millis is invalid, or IOError if another\n\
+error occurs.\n\
+\n\
+@param timeout_millis: the amount of time to wait, in milliseconds.\n\
+@return 0 if the function timed out, >1 if a message was handled.\n\
+");
+
 static PyMethodDef pylcm_methods[] = {
     { "handle", (PyCFunction)pylcm_handle, METH_NOARGS, pylcm_handle_doc },
+    { "handle_timeout", (PyCFunction)pylcm_handle_timeout, METH_O,
+      pylcm_handle_timeout_doc },
     { "subscribe", (PyCFunction)pylcm_subscribe, METH_VARARGS, 
         pylcm_subscribe_doc },
     { "unsubscribe", (PyCFunction)pylcm_unsubscribe, METH_VARARGS,
@@ -299,39 +382,44 @@ pylcm_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
 static void
 pylcm_dealloc (PyLCMObject *lcm_obj)
 {
-    dbg ("pylcm_dealloc\n");
+    dbg(DBG_PYTHON, "pylcm_dealloc\n");
     if (lcm_obj->lcm) {
         lcm_destroy (lcm_obj->lcm);
         lcm_obj->lcm = NULL;
     }
     Py_DECREF (lcm_obj->all_handlers);
-    lcm_obj->ob_type->tp_free ((PyObject*)lcm_obj);
+    Py_TYPE (lcm_obj)->tp_free ((PyObject*)lcm_obj);
 }
 
 static int
 pylcm_initobj (PyObject *self, PyObject *args, PyObject *kwargs)
 {
-    dbg ("%s %p\n", __FUNCTION__, self);
-    PyLCMObject *s = (PyLCMObject *)self;
+    dbg(DBG_PYTHON, "%s %p\n", __FUNCTION__, self);
+    PyLCMObject *lcm_obj = (PyLCMObject *)self;
 
     char *url = NULL;
 
     if (!PyArg_ParseTuple (args, "|s", &url))
         return -1;
 
-    s->lcm = lcm_create (url);
-    if (! s->lcm) {
+    lcm_obj->lcm = lcm_create (url);
+    if (! lcm_obj->lcm) {
         PyErr_SetString (PyExc_RuntimeError, "Couldn't create LCM");
         return -1;
     }
+    lcm_obj->saved_thread_state = NULL;
 
     return 0;
 }
 
 /* Type object for socket objects. */
 PyTypeObject pylcm_type = {
+#if PY_MAJOR_VERSION >= 3
+    PyVarObject_HEAD_INIT (0, 0) /* size is now part of macro */
+#else
     PyObject_HEAD_INIT (0)   /* Must fill in type value later */
     0,                  /* ob_size */
+#endif
     "LCM",            /* tp_name */
     sizeof (PyLCMObject),     /* tp_basicsize */
     0,                  /* tp_itemsize */

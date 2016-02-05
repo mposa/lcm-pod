@@ -100,25 +100,10 @@ is_same_type (const lcm_typename_t *tn1, const lcm_typename_t *tn2) {
     return ! strcmp (tn1->lctypename, tn2->lctypename);
 }
 
-static int
-is_same_package (const lcm_typename_t *tn1, const lcm_typename_t *tn2) {
-    return ! strcmp (tn1->package, tn2->package);
-}
-
-static const char *
-nil_initializer_string(const lcm_typename_t *type)
-{
-    if (!strcmp(type->lctypename, "byte")) return "0";
-    if (!strcmp(type->lctypename, "boolean")) return "False";
-    if (!strcmp(type->lctypename, "int8_t")) return "0";
-    if (!strcmp(type->lctypename, "int16_t")) return "0";
-    if (!strcmp(type->lctypename, "int32_t")) return "0";
-    if (!strcmp(type->lctypename, "int64_t")) return "0";
-    if (!strcmp(type->lctypename, "float")) return "0.0";
-    if (!strcmp(type->lctypename, "double")) return "0.0";
-    if (!strcmp(type->lctypename, "string")) return "\"\"";
-    else return "None";
-}
+//static int
+//is_same_package (const lcm_typename_t *tn1, const lcm_typename_t *tn2) {
+//    return ! strcmp (tn1->package, tn2->package);
+//}
 
 static char
 _struct_format (lcm_member_t *lm) 
@@ -163,7 +148,9 @@ _emit_decode_one (const lcmgen_t *lcm, FILE *f, lcm_struct_t *ls,
                 accessor, mn, sfx);
     } else if (!strcmp ("byte", tn)) {
         emit (indent, "%sstruct.unpack('B', buf.read(1))[0]%s", accessor, sfx);
-    } else if (!strcmp ("int8_t", tn) || !(strcmp ("boolean", tn))) {
+    } else if (!(strcmp ("boolean", tn))) {
+        emit (indent, "%sbool(struct.unpack('b', buf.read(1))[0])%s", accessor, sfx);
+    } else if (!strcmp ("int8_t", tn)) {
         emit (indent, "%sstruct.unpack('b', buf.read(1))[0]%s", accessor, sfx);
     } else if (!strcmp ("int16_t", tn)) {
         emit (indent, "%sstruct.unpack('>h', buf.read(2))[0]%s", accessor, sfx);
@@ -178,8 +165,6 @@ _emit_decode_one (const lcmgen_t *lcm, FILE *f, lcm_struct_t *ls,
     } else {
         if (is_same_type (lm->type, ls->structname)) {
             emit (indent, "%s%s._decode_one(buf)%s", accessor, sn, sfx);
-        } else if (is_same_package (lm->type, ls->structname)) {
-            emit (indent, "%s%s.%s._decode_one(buf)%s", accessor, sn, sn, sfx);
         } else {
             emit (indent, "%s%s._decode_one(buf)%s", accessor, tn, sfx);
         }
@@ -199,8 +184,18 @@ _emit_decode_list(const lcmgen_t *lcm, FILE *f, lcm_struct_t *ls,
     if (!strcmp ("byte", tn)) {
         emit (indent, "%sbuf.read(%s%s)%s", 
                 accessor, fixed_len ? "":"self.", len, suffix);
+    } else if (!strcmp ("boolean", tn)) {
+        if(fixed_len) {
+            emit (indent, "%smap(bool, struct.unpack('>%s%c', buf.read(%d)))%s",
+                    accessor, len, _struct_format(lm),
+                    atoi(len) * _primitive_type_size(tn),
+                    suffix);
+        } else {
+            emit (indent,
+                    "%smap(bool, struct.unpack('>%%d%c' %% self.%s, buf.read(self.%s)))%s",
+                    accessor, _struct_format(lm), len, len, suffix);
+        }
     } else if (!strcmp ("int8_t", tn) || 
-               !strcmp ("boolean", tn) ||
                !strcmp ("int16_t", tn) ||
                !strcmp ("int32_t", tn) ||
                !strcmp ("int64_t", tn) ||
@@ -268,7 +263,7 @@ emit_python_decode_one (const lcmgen_t *lcm, FILE *f, lcm_struct_t *ls)
         char fmt = _struct_format (lm);
 
         if (! lm->dimensions->len) {
-            if (fmt) {
+            if (fmt && strcmp(lm->type->lctypename, "boolean")) {
                 g_queue_push_tail (struct_fmt, GINT_TO_POINTER ((int)fmt));
                 g_queue_push_tail (struct_members, lm);
             } else {
@@ -360,7 +355,7 @@ emit_python_decode (const lcmgen_t *lcm, FILE *f, lcm_struct_t *ls)
     emit (2, "if hasattr(data, 'read'):");
     emit (3,     "buf = data");
     emit (2, "else:");
-    emit (3,     "buf = StringIO.StringIO(data)");
+    emit (3,     "buf = BytesIO(data)");
     emit (2, "if buf.read(8) != %s._get_packed_fingerprint():", 
             ls->structname->shortname);
     emit (3,     "raise ValueError(\"Decode error\")");
@@ -379,7 +374,7 @@ _emit_encode_one (const lcmgen_t *lcm, FILE *f, lcm_struct_t *ls,
         emit (indent, "__%s_encoded = %s.encode('utf-8')", mn, accessor);
         emit (indent, "buf.write(struct.pack('>I', len(__%s_encoded)+1))", mn);
         emit (indent, "buf.write(__%s_encoded)", mn);
-        emit (indent, "buf.write(\"\\0\")");
+        emit (indent, "buf.write(b\"\\0\")");
     } else if (!strcmp ("byte", tn)) {
         emit (indent, "buf.write(struct.pack('B', %s))", accessor);
     } else if (!strcmp ("int8_t", tn) || !strcmp ("boolean", tn)) {
@@ -395,15 +390,13 @@ _emit_encode_one (const lcmgen_t *lcm, FILE *f, lcm_struct_t *ls,
     } else if (!strcmp ("double", tn)) {
         emit (indent, "buf.write(struct.pack('>d', %s))", accessor);
     } else {
+        const char *sn = lm->type->shortname;
+        const char *gpf = "_get_packed_fingerprint()";
         if(is_same_type(lm->type, ls->structname)) {
-            emit(indent, "assert %s._get_packed_fingerprint() == %s._get_packed_fingerprint()", accessor,
-                    lm->type->shortname);
-        } else if(is_same_package(ls->structname, lm->type)) {
-            emit(indent, "assert %s._get_packed_fingerprint() == %s.%s._get_packed_fingerprint()",
-                    accessor, lm->type->shortname, lm->type->shortname);
+            emit(indent, "assert %s.%s == %s.%s", accessor, gpf, sn, gpf);
         } else {
-            emit(indent, "assert %s._get_packed_fingerprint() == %s.%s._get_packed_fingerprint()",
-                    accessor, lm->type->lctypename, lm->type->shortname);
+            emit(indent, "assert %s.%s == %s.%s",
+                 accessor, gpf, lm->type->lctypename, gpf);
         }
         emit (indent, "%s._encode_one(buf)", accessor);
     }
@@ -416,7 +409,7 @@ _emit_encode_list(const lcmgen_t *lcm, FILE *f, lcm_struct_t *ls,
 {
     const char *tn = lm->type->lctypename;
     if (!strcmp ("byte", tn)) {
-        emit (indent, "buf.write(%s[:%s%s])", 
+        emit (indent, "buf.write(bytearray(%s[:%s%s]))", 
                 accessor, (fixed_len?"":"self."), len);
         return;
     } else if (!strcmp ("boolean", tn) ||
@@ -536,7 +529,7 @@ static void
 emit_python_encode (const lcmgen_t *lcm, FILE *f, lcm_struct_t *ls)
 {
     emit(1, "def encode(self):");
-    emit(2, "buf = StringIO.StringIO()");
+    emit(2, "buf = BytesIO()");
     emit(2, "buf.write(%s._get_packed_fingerprint())", 
             ls->structname->shortname);
     emit(2, "self._encode_one(buf)");
@@ -549,8 +542,31 @@ emit_member_initializer(const lcmgen_t* lcm, FILE *f, lcm_member_t* lm,
         int dim_num)
 {
     if(dim_num == lm->dimensions->len) {
-        fprintf(f, "%s", nil_initializer_string(lm->type));
+        const char* tn = lm->type->lctypename;
+        const char* initializer = NULL;
+        if (!strcmp(tn, "byte")) initializer = "0";
+        else if (!strcmp(tn, "boolean")) initializer = "False";
+        else if (!strcmp(tn, "int8_t")) initializer = "0";
+        else if (!strcmp(tn, "int16_t")) initializer = "0";
+        else if (!strcmp(tn, "int32_t")) initializer = "0";
+        else if (!strcmp(tn, "int64_t")) initializer = "0";
+        else if (!strcmp(tn, "float")) initializer = "0.0";
+        else if (!strcmp(tn, "double")) initializer = "0.0";
+        else if (!strcmp(tn, "string")) initializer = "\"\"";
+
+        if (initializer != NULL) {
+            fprintf(f, "%s", initializer);
+        } else {
+            fprintf(f, "%s()", tn);
+        }
         return;
+    }
+    if (dim_num == lm->dimensions->len - 1 &&
+        // Arrays of bytes get treated as strings, so that they can be more
+        // efficiently packed and unpacked.
+        !strcmp(lm->type->lctypename, "byte")) {
+      fprintf(f, "\"\"");
+      return;
     }
     lcm_dimension_t *dim = 
         (lcm_dimension_t *) g_ptr_array_index (lm->dimensions, dim_num);
@@ -602,10 +618,8 @@ emit_python_fingerprint (const lcmgen_t *lcm, FILE *f, lcm_struct_t *ls)
             const char *ghr = "_get_hash_recursive(newparents)";
             if (is_same_type (lm->type, ls->structname)) {
                 emit_continue ("+ %s.%s", msn, ghr);
-            } else if (is_same_package (lm->type, ls->structname)) {
-                emit_continue ("+ %s.%s.%s", msn, msn, ghr);
             } else {
-                emit_continue ("+ %s.%s", lm->type->lctypename, ghr);
+                emit_continue ("+ %s.%s.%s", lm->type->package, msn, ghr);
             }
         }
     }
@@ -633,24 +647,17 @@ emit_python_dependencies (const lcmgen_t *lcm, FILE *f, lcm_struct_t *ls)
     GHashTable *dependencies = g_hash_table_new (g_str_hash, g_str_equal);
     for (unsigned int m=0; m<ls->members->len; m++) {
         lcm_member_t *lm = (lcm_member_t *) g_ptr_array_index (ls->members, m);
-        if (! lcm_is_primitive_type (lm->type->lctypename)) {
-            if (strlen (lm->type->package) && 
-                ! is_same_package (ls->structname, lm->type)) {
-                if (! g_hash_table_lookup (dependencies, lm->type->lctypename)) {
-                    g_hash_table_insert (dependencies, lm->type->lctypename, 
-                            lm->type->lctypename);
-                }
-            } else if (! g_hash_table_lookup (dependencies, 
-                        lm->type->shortname)){
-                g_hash_table_insert (dependencies, lm->type->shortname, 
-                        lm->type->shortname);
-            }
+        if (! lcm_is_primitive_type (lm->type->lctypename) &&
+            ! g_hash_table_lookup (dependencies, lm->type->lctypename)) {
+            g_hash_table_insert (dependencies, lm->type->lctypename,
+                                 lm->type->lctypename);
         }
     }
+
     GPtrArray *deps = _hash_table_get_vals (dependencies);
     for (int i=0; i<deps->len; i++) {
         const char *package = (char *) g_ptr_array_index (deps, i);
-        emit (0, "import %s\n", package);
+        emit(0, "import %s\n", package);
     }
     g_ptr_array_free (deps, TRUE);
     g_hash_table_destroy (dependencies);
@@ -730,8 +737,8 @@ emit_package (lcmgen_t *lcm, _package_contents_t *pc)
 
             // close init_py_fp if already open
             if(init_py_fp) {
-            	fclose(init_py_fp);
-            	init_py_fp = NULL;
+                fclose(init_py_fp);
+                init_py_fp = NULL;
             }
 
             if (! g_file_test (initpy_fname, G_FILE_TEST_EXISTS)) {
@@ -785,8 +792,8 @@ emit_package (lcmgen_t *lcm, _package_contents_t *pc)
                     if(!words[0] || !words[1] || !words[2] || !words[3])
                         continue;
                     if(!strcmp(words[0], "from") && !strcmp(words[2], "import")) {
-                        char *module_name = strdup(words[1]);
-                        g_hash_table_insert(init_py_imports, module_name, 
+                        char *module_name = strdup(words[1]+1); // ignore leading dot
+                        g_hash_table_replace(init_py_imports, module_name, 
                                 module_name);
                     }
 
@@ -808,7 +815,7 @@ emit_package (lcmgen_t *lcm, _package_contents_t *pc)
 
         if(init_py_fp && 
            !g_hash_table_lookup(init_py_imports, le->enumname->shortname))
-            fprintf(init_py_fp, "from %s import %s\n", 
+            fprintf(init_py_fp, "from .%s import %s\n", 
                     le->enumname->shortname,
                     le->enumname->shortname);
 
@@ -823,8 +830,11 @@ emit_package (lcmgen_t *lcm, _package_contents_t *pc)
                 "DO NOT MODIFY BY HAND!!!!\n"
                 "\"\"\"\n"
                 "\n"
-                "import cStringIO as StringIO\n"
-                "import struct\n");
+                "try:\n"
+                "    import cStringIO.StringIO as BytesIO\n"
+                "except ImportError:\n"
+                "    from io import BytesIO\n"
+                "import struct\n\n");
 
         // enums always encoded as int32
         emit (0, "class %s(object):", le->enumname->shortname);
@@ -862,7 +872,7 @@ emit_package (lcmgen_t *lcm, _package_contents_t *pc)
         emit (2,     "if hasattr (data, 'read'):");
         emit (3,         "buf = data");
         emit (2,     "else:");
-        emit (3,         "buf = StringIO.StringIO(data)");
+        emit (3,         "buf = BytesIO(data)");
         emit (2,     "if buf.read(8) != %s._packed_fingerprint:", 
                 le->enumname->shortname);
         emit (3,         "raise ValueError(\"Decode error\")");
@@ -889,7 +899,7 @@ emit_package (lcmgen_t *lcm, _package_contents_t *pc)
 
         if(init_py_fp && 
            !g_hash_table_lookup(init_py_imports, ls->structname->shortname))
-            fprintf(init_py_fp, "from %s import %s\n", 
+            fprintf(init_py_fp, "from .%s import %s\n", 
                     ls->structname->shortname,
                     ls->structname->shortname);
 
@@ -904,7 +914,10 @@ emit_package (lcmgen_t *lcm, _package_contents_t *pc)
                 "DO NOT MODIFY BY HAND!!!!\n"
                 "\"\"\"\n"
                 "\n"
-                "import cStringIO as StringIO\n"
+                "try:\n"
+                "    import cStringIO.StringIO as BytesIO\n"
+                "except ImportError:\n"
+                "    from io import BytesIO\n"
                 "import struct\n\n");
 
         emit_python_dependencies (lcm, f, ls);

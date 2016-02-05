@@ -193,7 +193,7 @@ int check_lcmtest_primitives_list_t(const lcmtest_primitives_list_t* msg, int ex
         const lcmtest_primitives_t* ex = &msg->items[n];
         CHECK_FIELD(ex->i8, -(n % 100), "%d");
         CHECK_FIELD(ex->i16, -n * 10, "%d");
-        CHECK_FIELD(ex->i64, (int64_t)(-n * 10000), "%" PRId64);
+        CHECK_FIELD(ex->i64, (int64_t)(-n * 10000), "%"PRId64);
         CHECK_FIELD(ex->position[0], (double)-n, "%f");
         CHECK_FIELD(ex->position[1], (double)-n, "%f");
         CHECK_FIELD(ex->position[2], (double)-n, "%f");
@@ -265,7 +265,7 @@ check_lcmtest_primitives_t(const lcmtest_primitives_t* msg, int expected)
     int n = expected;
     CHECK_FIELD(msg->i8,  n % 100, "%d");
     CHECK_FIELD(msg->i16, n * 10, "%d");
-    CHECK_FIELD(msg->i64, (int64_t)(n * 10000), "%" PRId64);
+    CHECK_FIELD(msg->i64, (int64_t)(n * 10000), "%"PRId64);
     CHECK_FIELD(msg->position[0], (double)n, "%f");
     CHECK_FIELD(msg->position[1], (double)n, "%f");
     CHECK_FIELD(msg->position[2], (double)n, "%f");
@@ -316,4 +316,63 @@ clear_lcmtest_primitives_t(lcmtest_primitives_t* msg)
 {
     free(msg->ranges);
     free(msg->name);
+}
+
+int
+check_lcmtest2_cross_package_t(const lcmtest2_cross_package_t* msg, int expected)
+{
+    return check_lcmtest_primitives_t(&msg->primitives, expected) &&
+        check_lcmtest2_another_type_t(&msg->another, expected);
+}
+
+void
+fill_lcmtest2_cross_package_t(int n, lcmtest2_cross_package_t* msg)
+{
+    fill_lcmtest_primitives_t(n, &msg->primitives);
+    fill_lcmtest2_another_type_t(n, &msg->another);
+}
+
+void
+clear_lcmtest2_cross_package_t(lcmtest2_cross_package_t* msg)
+{
+    clear_lcmtest_primitives_t(&msg->primitives);
+    clear_lcmtest2_another_type_t(&msg->another);
+}
+
+int
+check_lcmtest2_another_type_t(const lcmtest2_another_type_t* msg, int expected)
+{
+    int n = expected;
+    CHECK_FIELD(msg->val, n, "%d");
+    return 1;
+}
+
+void
+fill_lcmtest2_another_type_t(int n, lcmtest2_another_type_t* msg)
+{
+    msg->val = n;
+}
+
+void
+clear_lcmtest2_another_type_t(lcmtest2_another_type_t* msg)
+{
+    return;
+}
+
+char*
+make_tmpnam()
+{
+#ifndef WIN32
+    return tmpnam(NULL);
+#else
+    return _tempnam(NULL, NULL);
+#endif
+}
+
+void
+free_tmpnam(char* tmpnam)
+{
+#ifdef WIN32
+    free(tmpnam);
+#endif
 }

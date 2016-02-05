@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <cstdio>  /* needed for FILE* */
 #include "lcm.h"
 
 namespace lcm {
@@ -25,6 +26,7 @@ struct ReceiveBuffer;
 /**
  * @brief Core communications class for the C++ API.
  *
+ * @headerfile lcm/lcm-cpp.hpp
  */
 class LCM {
     public:
@@ -74,7 +76,7 @@ class LCM {
          *
          * @return 0 on success, -1 on failure.
          */
-        inline int publish(const std::string& channel, void *data,
+        inline int publish(const std::string& channel, const void *data,
                 unsigned int datalen);
 
         /**
@@ -110,12 +112,23 @@ class LCM {
         inline int getFileno();
 
         /**
-         * @brief Waits for and dispatches one message.
+         * @brief Waits for and dispatches messages.
          *
          * @return 0 on success, -1 if something went wrong.
          * @sa lcm_handle()
          */
         inline int handle();
+
+        /**
+         * @brief Waits for and dispatches messages, with a timeout.
+         *
+         * New in LCM 1.1.0.
+         *
+         * @return >0 if a message was handled, 0 if the function timed out,
+         * and <0 if an error occured.
+         * @sa lcm_handle_timeout()
+         */
+        inline int handleTimeout(int timeout_millis);
 
         /**
          * @brief Subscribes a callback method of an object to a channel, with
@@ -350,8 +363,11 @@ class LCM {
          *
          * @param subscription a Subscription object previously returned by a
          * call to subscribe() or subscribeFunction().
+         *
+         * @return 0 on success, -1 if @p subscription is not a valid
+         * subscription.
          */
-        inline void unsubscribe(Subscription* subscription);
+        inline int unsubscribe(Subscription* subscription);
 
         /**
          * @brief retrives the lcm_t C data structure wrapped by this class.
@@ -375,6 +391,8 @@ class LCM {
 
 /**
  * @brief Stores the raw bytes and timestamp of a received message.
+ *
+ * @headerfile lcm/lcm-cpp.hpp
  */
 struct ReceiveBuffer {
     /**
@@ -402,6 +420,8 @@ struct ReceiveBuffer {
  *
  * To unsubscribe, pass the instance to LCM::unsubscribe().  Once unsubscribed,
  * the object is destroyed and can not be used anymore.
+ *
+ * @headerfile lcm/lcm-cpp.hpp
  */
 class Subscription {
     public:
@@ -441,6 +461,8 @@ class Subscription {
  * This struct is the C++ counterpart for lcm_eventlog_event_t.
  *
  * @sa lcm_eventlog_event_t
+ *
+ * @headerfile lcm/lcm-cpp.hpp
  */
 struct LogEvent {
     /**
@@ -473,6 +495,8 @@ struct LogEvent {
  * This class is the C++ counterpart for lcm_eventlog_t.
  *
  * @sa lcm_eventlog_t
+ *
+ * @headerfile lcm/lcm-cpp.hpp
  */
 class LogFile {
     public:
@@ -528,6 +552,18 @@ class LogFile {
          * @sa lcm_eventlog_write_event()
          */
         inline int writeEvent(LogEvent* event);
+
+        /**
+         * @brief retrives the underlying FILE* wrapped by this class.
+         *
+         * This method should be used carefully and sparingly.
+         * An example use-case is borrowing to tweak the behavior of the I/O.
+         * Calls of interest include fflush(), fileno(), setvbuf(), etc
+         * It is a bad idea to attempt reading or writing on the raw FILE*
+         *
+         * @return the FILE* wrapped by this object.
+         */
+         inline FILE* getFilePtr();
 
     private:
         LogEvent curEvent;

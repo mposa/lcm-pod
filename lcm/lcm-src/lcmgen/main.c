@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <inttypes.h>
 #include "lcmgen.h"
+#include "../lcm/lcm.h"
 
 #ifdef WIN32
 #include <lcm/windows/WinPorting.h>
@@ -46,6 +47,9 @@ int main(int argc, char *argv[])
     getopt_add_bool  (gopt, 't',  "tokenize", 0,    "Show tokenization");
     getopt_add_bool  (gopt, 'd',  "debug",    0,    "Show parsed file");
     getopt_add_bool  (gopt, 0,    "lazy",     0,    "Generate output file only if .lcm is newer");
+    getopt_add_string(gopt, 0,    "package-prefix",     "",
+                      "Add this package name as a prefix to the declared package");
+    getopt_add_bool  (gopt, 0,  "version",    0,    "Show version information and exit");
 
     // we only support portable declarations now.
     // getopt_add_bool  (gopt, 0,    "warn-unsafe", 1, "Warn about unportable declarations");
@@ -88,16 +92,23 @@ int main(int argc, char *argv[])
 
         int res = lcmgen_handle_file(lcm, path);
         if (res)
-            return -1;
+            return res;
     }
 
-    int did_something = 0;
-    // if they requested tokenizing (debug) output, we've done that now. Exit.
+    // If "--version" was specified, then show version information and exit.
+    if (getopt_get_bool(gopt, "version")) {
+      printf("lcm-gen %d.%d.%d\n", LCM_MAJOR_VERSION, LCM_MINOR_VERSION,
+          LCM_MICRO_VERSION);
+      return 0;
+    }
+
+    // If "-t" or "--tokenize" was specified, then show tokenization
+    // information and exit.
     if (getopt_get_bool(gopt, "tokenize")) {
-        did_something = 1;
         return 0;
     }
 
+    int did_something = 0;
     if (getopt_get_bool(gopt, "debug")) {
         did_something = 1;
         lcmgen_dump(lcm);

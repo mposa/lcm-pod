@@ -8,7 +8,7 @@ readonly name="lcm"
 readonly ownership="LCM Upstream <kwrobot@kitware.com>"
 readonly subtree="$name/$name-src"
 readonly repo="https://github.com/lcm-proj/lcm.git"
-readonly tag="v1.0.0"
+readonly tag="v1.3.0"
 
 extract_source () {
     git_archive

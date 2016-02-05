@@ -15,6 +15,10 @@ typedef struct {
     int exception_raised;
 
     PyObject *all_handlers;
+
+    // Stores the state of the thread that calls LCM.handle() or
+    // LCM.handle_timeout()
+    PyThreadState *saved_thread_state;
 } PyLCMObject;
 
 #ifdef __cplusplus
