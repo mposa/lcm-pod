@@ -7,37 +7,17 @@ set (CMAKE_JAVA_TARGET_OUTPUT_NAME lcm)  # todo: remove this when cmake min vers
 # initialize values of the named arguments. (Giving the corresponding named
 # argument will override the value set here.)
 
+set(jchart2d_src_dir ${CMAKE_CURRENT_SOURCE_DIR}/jchart2d-code/src)
+set(jide_jar ${CMAKE_CURRENT_SOURCE_DIR}/jchart2d-code/ext/jide-oss-2.9.7.jar)
+set(xmlgraphics_jar ${CMAKE_CURRENT_SOURCE_DIR}/jchart2d-code/ext/xmlgraphics-commons-1.3.1.jar)
+
+FILE(GLOB_RECURSE lcm_java_files lcm/*.java)
+FILE(GLOB_RECURSE jchart2d_files ${jchart2d_src_dir}/*.java)
+MESSAGE("Java Files: ${lcm_java_files}")
+
 add_jar(lcm-java
-    lcm/lcm/LCMEncodable.java
-    lcm/lcm/LCM.java
-    lcm/lcm/LCMSubscriber.java
-    lcm/lcm/URLParser.java
-    lcm/lcm/Provider.java
-    lcm/lcm/TCPProvider.java
-    lcm/lcm/UDPMulticastProvider.java
-    lcm/lcm/TCPService.java
-    lcm/lcm/LogFileProvider.java
-    lcm/lcm/TCPProvider.java
-    lcm/lcm/MessageAggregator.java
-    lcm/lcm/LCMDataInputStream.java
-    lcm/lcm/LCMDataOutputStream.java
-    lcm/util/BufferedRandomAccessFile.java
-    lcm/util/ColorMapper.java
-    lcm/util/TableSorter.java
-    lcm/util/ParameterListener.java
-    lcm/util/ParameterGUI.java
-    lcm/util/JImage.java
-    lcm/util/ClassDiscoverer.java
-    lcm/logging/JScrubber.java
-    lcm/logging/JScrubberListener.java
-    lcm/logging/Log.java
-    lcm/logging/LogDiagnostic.java
-    lcm/logging/LogPlayer.java
-    lcm/spy/Spy.java
-    lcm/spy/SpyPlugin.java
-    lcm/spy/LCMTypeDatabase.java
-    lcm/spy/ObjectPanel.java
-    lcm/spy/ChannelData.java
+    SOURCES ${lcm_java_files} ${jchart2d_files}
+    INCLUDE_JARS ${jide_jar} ${xmlgraphics_jar}
     OUTPUT_NAME lcm)
 
 pods_install_jars(lcm-java)
