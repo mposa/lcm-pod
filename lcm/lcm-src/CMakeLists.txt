@@ -50,7 +50,33 @@ endif()
 
 find_package(PythonInterp)
 if (PYTHONINTERP_FOUND)
-  add_subdirectory(lcm-python)
+  set(pythonOK TRUE)
+  if(WIN32)
+    execute_process(
+      COMMAND "${PYTHON_EXECUTABLE}" -c
+      "import platform; print( platform.architecture()[0])"
+      OUTPUT_VARIABLE PYTHON_ARCH
+      RESULT_VARIABLE _PYTHON_ARCH_RESULT
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      )
+    if(_PYTHON_ARCH_RESULT EQUAL 0)
+      if(NOT "${PYTHON_ARCH}" MATCHES "64bit")
+        set(pythonOK FALSE)
+        message(STATUS
+          "lcm-python disabled becuase python is not 64bit but is:"
+          " ${PYTHON_ARCH}")
+      else()
+        message(STATUS "lcm-python enabled 64 bit python found.")
+      endif()
+    else()
+      message(STATUS
+          "lcm-python disabled becuase can not determine python arch.")
+        set(pythonOK FALSE)
+    endif()
+  endif()
+  if(pythonOK)
+    add_subdirectory(lcm-python)
+  endif()
 endif()
 
 # todo: add "if lua" logic
