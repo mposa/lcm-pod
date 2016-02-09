@@ -19,17 +19,17 @@ set(CMAKE_JAVA_INCLUDE_PATH ${JAR_EXTRACT_DIR})
 FILE(MAKE_DIRECTORY ${JAR_EXTRACT_DIR})
 
 # Extract all the JAR files to a temporary "build" directory
-FOREACH(JAR ${xmlgraphics_jar} ${jide_jar})
-  # MESSAGE("Extracting JAR File: ${JAR}")
-  execute_process(
-    COMMAND ${Java_JAR_EXECUTABLE} "-xf" ${JAR}
-    WORKING_DIRECTORY ${JAR_EXTRACT_DIR}
+add_custom_target(lcm-extract-jars
+  COMMAND ${Java_JAR_EXECUTABLE} "-xf" ${xmlgraphics_jar}
+  COMMAND ${Java_JAR_EXECUTABLE} "-xf" ${jide_jar}
+  WORKING_DIRECTORY ${JAR_EXTRACT_DIR}
   )
-ENDFOREACH()
 
 add_jar(lcm-java
   SOURCES ${lcm_java_files} ${jchart2d_files}
   OUTPUT_NAME lcm)
+
+add_dependencies(lcm-java lcm-extract-jars)
 
 get_target_property(LCM_JAR_FILE lcm-java JAR_FILE)
 
