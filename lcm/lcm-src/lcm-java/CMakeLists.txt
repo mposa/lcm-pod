@@ -14,10 +14,32 @@ set(xmlgraphics_jar ${CMAKE_CURRENT_SOURCE_DIR}/jchart2d-code/ext/xmlgraphics-co
 FILE(GLOB_RECURSE lcm_java_files lcm/*.java)
 FILE(GLOB_RECURSE jchart2d_files ${jchart2d_src_dir}/*.java)
 
+set(JAR_EXTRACT_DIR "${CMAKE_CURRENT_BINARY_DIR}/jarbuild")
+set(CMAKE_JAVA_INCLUDE_PATH ${JAR_EXTRACT_DIR})
+FILE(MAKE_DIRECTORY ${JAR_EXTRACT_DIR})
+
+# Extract all the JAR files to a temporary "build" directory
+FOREACH(JAR ${xmlgraphics_jar} ${jide_jar})
+  # MESSAGE("Extracting JAR File: ${JAR}")
+  execute_process(
+    COMMAND ${Java_JAR_EXECUTABLE} "-xf" ${JAR}
+    WORKING_DIRECTORY ${JAR_EXTRACT_DIR}
+  )
+ENDFOREACH()
+
 add_jar(lcm-java
-    SOURCES ${lcm_java_files} ${jchart2d_files}
-    INCLUDE_JARS ${jide_jar} ${xmlgraphics_jar}
-    OUTPUT_NAME lcm)
+  SOURCES ${lcm_java_files} ${jchart2d_files}
+  OUTPUT_NAME lcm)
+
+get_target_property(LCM_JAR_FILE lcm-java JAR_FILE)
+
+# Add the class files from the external JARS into our lcm jar output by add_jar
+add_custom_command(TARGET lcm-java
+  POST_BUILD
+  COMMAND ${Java_JAR_EXECUTABLE} uf ${LCM_JAR_FILE} *
+  WORKING_DIRECTORY ${JAR_EXTRACT_DIR}
+  )
+
 
 pods_install_jars(lcm-java)
 
