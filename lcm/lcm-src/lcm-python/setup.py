@@ -35,11 +35,11 @@ if os.name == 'nt':
     if not vs90tools:
         os.environ['VS90COMNTOOLS'] = os.getenv('VS140COMNTOOLS')
     # check for GLIB_PATH environment var
-    # if not set assume we are in externals/lcm/lcm-version/pod-build
+    # if not set assume we are in externals/lcm/lcm/lcm-version/pod-build
     # and use that to get to externals/gtk/gtk3
     glibPath = os.getenv('GLIB_PATH')
     if not glibPath:
-        glibPath = os.path.realpath(os.path.join("..", "..", "..", "gtk", "gtk3"))
+        glibPath = os.path.realpath(os.path.join("..", "..", "..", "..", "gtk", "gtk3"))
 
     include_dirs = [ \
             "..",
