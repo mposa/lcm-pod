@@ -29,6 +29,4 @@ ExternalProject_Add_Step(lcm forceconfigure
 	DEPENDERS configure
 	ALWAYS 1)
 
-# Tell cmake to let us create "install" target
-cmake_policy(SET CMP0037 OLD)
-add_custom_target(install DEPENDS lcm)  # just to have an explicit install rule
+install(CODE "message(\"Nothing to do for install.\")")
