@@ -50,6 +50,11 @@ endif()
 
 find_package(PythonInterp)
 if (PYTHONINTERP_FOUND)
+  if (CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(DESIRED_PYTHON_ARCH "64bit")
+  else()
+    set(DESIRED_PYTHON_ARCH "32bit")
+  endif()
   set(pythonOK TRUE)
   if(WIN32)
     execute_process(
@@ -60,13 +65,13 @@ if (PYTHONINTERP_FOUND)
       OUTPUT_STRIP_TRAILING_WHITESPACE
       )
     if(_PYTHON_ARCH_RESULT EQUAL 0)
-      if(NOT "${PYTHON_ARCH}" MATCHES "64bit")
+      if(NOT "${PYTHON_ARCH}" MATCHES "${DESIRED_PYTHON_ARCH}")
         set(pythonOK FALSE)
         message(STATUS
-          "lcm-python disabled becuase python is not 64bit but is:"
+          "lcm-python disabled becuase python is not ${DESIRED_PYTHON_ARCH} but is:"
           " ${PYTHON_ARCH}")
       else()
-        message(STATUS "lcm-python enabled 64 bit python found.")
+        message(STATUS "lcm-python enabled matching python architecture found.")
       endif()
     else()
       message(STATUS
