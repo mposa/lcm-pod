@@ -13,33 +13,33 @@ CMAKE_CONFIG=--config $(BUILD_TYPE)
 
 .PHONY: all
 all: configure
-	cmake --build lcm-1.0.0/pod-build $(CMAKE_CONFIG) --target install
+	cmake --build lcm-1.3.1/pod-build $(CMAKE_CONFIG) --target install
 
-lcm-1.0.0/pod-build:
-	cmake -E make_directory lcm-1.0.0/pod-build
+lcm-1.3.1/pod-build:
+	cmake -E make_directory lcm-1.3.1/pod-build
 
 .PHONY: configure
-configure: lcm-1.0.0/pod-build
+configure: lcm-1.3.1/pod-build
 	@echo Configuring with CMAKE_FLAGS: $(CMAKE_FLAGS)
-	@cd lcm-1.0.0/pod-build && cmake $(CMAKE_FLAGS) ..
+	@cd lcm-1.3.1/pod-build && cmake $(CMAKE_FLAGS) ..
 
 .PHONY: options
 options: configure
 ifeq ($(OS),Windows_NT)
-	cmake-gui lcm-1.0.0/pod-build
+	cmake-gui lcm-1.3.1/pod-build
 else
-	ccmake lcm-1.0.0/pod-build
+	ccmake lcm-1.3.1/pod-build
 endif
 
 .PHONY: clean
 clean:
-	cmake --build lcm-1.0.0/pod-build --target clean
-	cmake -E remove_directory lcm-1.0.0/pod-build
+	cmake --build lcm-1.3.1/pod-build --target clean
+	cmake -E remove_directory lcm-1.3.1/pod-build
 	cmake -E remove_directory build
 
 # other (custom) targets are passed through to the cmake-generated Makefile
 %::
-	cmake --build lcm-1.0.0/pod-build $(CMAKE_CONFIG) --target $@
+	cmake --build lcm-1.3.1/pod-build $(CMAKE_CONFIG) --target $@
 
 # Default to a less-verbose build.  If you want all the gory compiler output,
 # run "make VERBOSE=1"
